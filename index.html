@@ -13,20 +13,29 @@
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
 		<link rel="stylesheet" href="assets/css/main.css" />
 		<!--[if lte IE 8]><link rel="stylesheet" href="assets/css/ie8.css" /><![endif]-->
+		
+		<style>
+			.image.face {
+						float: left;
+						margin: 0 0.5em 0.5em 0;
+						top: 0.25em;
+						width: 150;
+					}
+			</style>
 	</head>
 	<body>
 
 		<!-- Header -->
 			<section id="header">
 				<header>
-					<span class="image avatar"><img src="images/avatar.jpg" alt="" /></span>
-					<h1 id="logo"><a href="#">David A Knowles</a></h1>
+					<span class="image avatar"><img src="images/logo.png" alt="" /></span>
+					<h1 id="logo"><a href="#">Knowles lab</a></h1>
 						<p>Machine learning and genomics</p>
 				</header>
 				<nav id="nav">
 					<ul>
 						<!-- <li><a href="#one" class="active">About</a></li> -->
-						<li><a href="#two">Research</a></li>
+						<li><a href="#two">People</a></li>
 						<li><a href="#three">Publications</a></li>
 						<li><a href="#four">Software</a></li>
 						<li><a href="#five">Reports/Abstracts/Presentations</a></li>
@@ -52,49 +61,71 @@
 							<section id="one">
 								<div class="container">
 									<header class="major">
-										<h2>David A Knowles</h2>
-					<p>Departments of Genetics and Radiology<br>Stanford University</p>
+										<h2>Knowles lab</h2>
+					<p>New York Genome Center / Columbia University</p>
 									</header>
-<p>In January 2018 I'll be starting a lab at the <a href="http://www.nygenome.org/">New York Genome Center</a> jointly with Columbia University. If you're thinking about postdoc positions and are interested in machine-learning-flavo(u)red genomics, gene regulation and/or RNA splicing, please get in <a href="mailto:david.arthur.knowles@gmail.com">touch</a>. I'll have lab space so that includes wet lab people looking to do damp projects! I'm also interested in hearing from machine learning folks with an interest in comp bio.</p>
+<p>The Knowles lab will be opening in January 2018 at the <a href="http://www.nygenome.org/">New York Genome Center</a>, jointly with Columbia University. I'm recruiting PhD students, two postdocs and a lab manager (see <a href="#two">People</a> below). If you're interested in machine-learning-flavo(u)red genomics, gene regulation and/or RNA splicing, please get in <a href="mailto:david.arthur.knowles@gmail.com">touch</a>! I'll have lab space so that includes wet lab people looking to do damp (mixed computational/experimental) projects. I'm also interested in hearing from machine learning folks who are curious about biological questions.</p>
 
-<p>I am a post-doctoral researcher at Stanford University with <a href="http://med.stanford.edu/plevritis.html">Sylvia Plevritis</a> (Center for Computational Systems Biology/Radiology) and <a href="http://pritchardlab.stanford.edu/">Jonathan Pritchard</a> (Genetics) having previously worked with <a href="http://ai.stanford.edu/~koller/">Daphne Koller</a> prior to her move to Coursera. I did my PhD with <a href="http://learning.eng.cam.ac.uk/zoubin/">Zoubin Ghahramani</a> in the <a href="http://mlg.eng.cam.ac.uk/">Machine Learning</a> group of the Cambridge University Engineering Department. I was the Roger Needham Scholar at Wolfson College, funded by Microsoft Research. My undergraduate degree comprised two years of Physics before switching to Engineering to complete an MEng with Zoubin. I took the <a href="http://www.bioinformatics.ic.ac.uk/">MSc Bioinformatics and Systems Biology</a> at <a href="http://www3.imperial.ac.uk/">Imperial College</a> in 2007/8. </p> 
-<p>Here's a <a href="http://www.youtube.com/watch?v=qr6i_5Onj7k">video</a> of me and my friend Johan falling off cliffs on skis in Flaine, France. 
-	<p>You can download my <a href="documents/david-knowles-resume.pdf">CV</a>.
+<p>Our research involves the development of novel machine learning methods and their application to data analysis challenges in genomics. We aim to understand the role of transcriptomic dysregulation across the spectrum from rare to common genetic disease. This involves better characterization of the genetic and environmental factors contributing to mRNA expression and splicing variation. We will be collaborating with diverse research groups at NYGC collecting large-scale genomics datasets in the context of <a href="http://www.nygenome.org/lab-groups-overview/center-genomics-neurodegenerative-disease-phatnani-lab/">neurological disease</a> and developing <a href="http://www.nygenome.org/lab-groups-overview/technology-innovation-lab/">novel genomic technologies</a> including <a href="https://satijalab.org/">single cell methods</a>, <a href="http://sanjanalab.org/home.html">forward genetic screens</a> and <a href="https://tllab.org/">long-read transcriptomics</a>.</p>
+<p>All lab members will have the option of being cross-trained in both computational analysis and experimental work. Postdocs and students are eligible for an appointment at Columbia University in either <a href="https://www.cs.columbia.edu/">Computer Science</a> or <a href="https://systemsbiology.columbia.edu/">Systems Biology</a>.</p>
+									<ul class="feature-icons">
+										<li class="fa-scissors"><a href="#splicing">RNA splicing</a></li>
+										<li class="fa-fighter-jet"><a href="#eagle">Gene-by-environment</a></li>
+										<!-- <li class="fa-microchip">Digital histology</li> -->
+										<li class="fa-wrench"><a href="#vb">Variational methods</a></li>
+										<li class="fa-snowflake-o"><a href="#bnp">Bayesian nonparametrics</a></li>
+									</ul>
+									
+									<section id="splicing">
+										<div>
+									<h4>RNA splicing</h4>
+									<p>We developed <a href="https://github.com/davidaknowles/leafcutter">LeafCutter</a> to identify, quantify and test variable intron splicing events, obviating the need for accurate transcript annotations and circumventing the challenges in estimating relative isoform abundance (<a href="#LeafCutter">link</a>). An early version of <em>LeafCutter</em> was used in <a href="#Li2016splicing">our study</a> linking complex disease and splicing. </p>
+								</div>
+							</section>
+								<section id="eagle"> <div>
+								<h4>Genetic differences in environmental response</h4>
+								<p>Phenotypic variation results from the interplay of genotype and environment: in particular genetic variation can modulate the transcriptomic response to perturbation. However, detecting gene by environment effects on the transcriptome is challenging in observational data. We developed a computational method, <a href="#Knowles2017gxe">EAGLE</a>, which leverages allele-specific expression as a controlled, with-in individual test of the influence of environment factors on different genetic backgrounds. Code is available on <a href="https://github.com/davidaknowles/eagle">github</a>. </p>
+								<p>Direct in vitro perturbation of cells can greatly increase power to detect GxE interaction effects due to increased effect sizes and controlled conditions. We have used human iPSC-derived somatic  cells to understand the genetic basis of cardiac sensitvity to doxorubicin. Anthracycline-cardiotoxicity (ACT) is a common side-effect of chemotherapy, but its genetic basis and molecular mechanism remain unclear. We measured transcriptomic and cellular damage response to doxorubicin in a panel of iPSC-derived cardiomyocytes from 45 individuals. Using a novel, efficient linear mixed model, <a href="https://github.com/davidaknowles/suez">suez</a>, we identified hundreds of loci that interact with ACT response. These response-QTLs are significantly enriched in ACT GWAS (<a href="#Knowles2018dox">link</a>). </p>
+								 </div> </section>
+								 <section id="vb"> <div>
+								<h4>Variational methods</h4>
+								<p>Variational methods offer a computationally efficient alternative to Markov chain Monte Carlo algorithms for inference in Bayesian probabilistic models. My work allows such methods to be more easily applied to a broader range of probabilistic models. I extended variational message passing to "non-conjugate" (intuitively, less tractable) models, and incorporated this method, <a href="#Knowles2011c">Non-conjugate VMP</a> (NCVMP), into the publicly available <a href="http://infernet.azurewebsites.net/">Infer.NET</a> software package. Later, Tim Salimans and I did early work on <a href='#salimans2014using'>using Monte Carlo estimation within variational learning</a>, which is now an active subfield of research under the moniker "Stochastic Variational Inference".</p>
+</div> </section>
+							<section id="bnp"> <div>
+							<h4>Bayesian nonparametric models</h4>
+							<p>Bayesian nonparametric (BNP) models are a category of statistical methods that automatically adapt their complexity to observed data. I have developed BNP methods for <a href="#Knowles2014">hierarchical clustering</a>, <a href="#wilson2011gaussian">heteroskedastic multivariate regression</a>, <a #href>network data</a>, <a href="#Palla2012nonparametric">variable clustering</a> and <a href='#Knowles2011nonparametric'>nonparametric sparse factor analysis</a> (NSFA). In particular, NSFA is able to adaptively choose an appropriate number of factors from data. I used this method to delineate gene co-expression modules from microarray data, and other researchers have subsequently used it in diverse applications including image denoising and EEG analysis.</p>
+</div> </section>
+								
+
 								</div>
 							</section>
 
 						<!-- Two -->
 							<section id="two">
 								<div class="container">
-									<h3>Research</h3>
-<p>My research involves both the development of novel machine learning methods and their application to data analysis problems in genomics, particularly genetic regulation of the transcriptome. <p>
-									<ul class="feature-icons">
-										<li class="fa-scissors"><a href="#splicing">RNA splicing</a></li>
-										<li class="fa-fighter-jet"><a href="#eagle">Gene-by-environment</a></li>
-										<!-- <li class="fa-microchip">Digital histology</li> -->
-										<li class="fa-snowflake-o"><a href="#bnp">Bayesian nonparametrics</a></a></li>
-										<li class="fa-wrench"><a href="#vb">Variational methods</a></li>
-									</ul>
-									
-									<section id="splicing">
-										<div>
-									<h4>RNA splicing</h4>
-									<p>We developed <em>LeafCutter</em> to identify, quantify and test variable intron splicing events, obviating the need for accurate transcript annotations and circumventing the challenges in estimating relative isoform abundance. An early version of <em>LeafCutter</em> was used in <a href="#Li2016splicing">our study</a> linking complex disease and splicing <a href="#Li2016c">a paper</a> describing the method is under review, and we actively maintain <a href="https://github.com/davidaknowles/leafcutter">code</a>. </p>
-								</div>
-							</section>
-								<section id="eagle"> <div>
-								<h4>Using allelic specific expression to detect GxE interaction effects</h4>
-								<p>Detecting gene by environment effects on the transcriptome is challenging in observational data. I developed a computational method, <a href="#Knowles2017gxe">EAGLE</a>, which leverages allele-specific expression as a controlled, with-in individual test of the influence of environment factors on different genetic backgrounds. Code is available on <a href="https://github.com/davidaknowles/eagle">github</a>.</p>
-								 </div> </section>
-							<section id="bnp"> <div>
-							<h4>Bayesian nonparametric models</h4>
-							<p>Bayesian nonparametric (BNP) models are a category of statistical methods that automatically adapt their complexity to observed data. I have developed BNP methods for <a href="#Knowles2014">hierarchical clustering</a>, <a href="#wilson2011gaussian">heteroskedastic multivariate regression</a>, <a #href>network data</a>, <a href="#Palla2012nonparametric">variable clustering</a> and <a href='#Knowles2011nonparametric'>nonparametric sparse factor analysis</a> (NSFA). In particular, NSFA is able to adaptively choose an appropriate number of factors from data. I used this method to delineate gene co-expression modules from microarray data, and other researchers have subsequently used it in diverse applications including image denoising and EEG analysis.</p>
-</div> </section>
-								<section id="vb"> <div>
-								<h4>Variational methods</h4>
-								<p>Variational methods offer a computationally efficient alternative to Markov chain Monte Carlo algorithms for inference in Bayesian probabilistic models. My work allows such methods to be more easily applied to a broader range of probabilistic models. I extended variational message passing to "non-conjugate" (intuitively, less tractable) models, and incorporated this method, <a href="#Knowles2011c">Non-conjugate VMP</a> (NCVMP), into the publicly available <a href="http://infernet.azurewebsites.net/">Infer.NET</a> software package. Later, Tim Salimans and I did early work on <a href='#salimans2014using'>using Monte Carlo estimation within variational learning</a>, which is now an active subfield of research under the moniker "Stochastic Variational Inference".</p>
-</div> </section>
+									<h3>People</h3>
+              <section id="david"> <div>
+								<h4>David A. Knowles, Principal Investigator</h4>
+							<p><div><span class="image face"><img src="images/avatar.jpg" alt="Profile pic" width=150/></span></div>I was a post-doctoral researcher at Stanford University with <a href="http://med.stanford.edu/plevritis.html">Sylvia Plevritis</a> (Center for Computational Systems Biology/Radiology) and <a href="http://pritchardlab.stanford.edu/">Jonathan Pritchard</a> (Genetics) having previously worked with <a href="http://ai.stanford.edu/~koller/">Daphne Koller</a> prior to her move to Coursera. I did my PhD with <a href="http://learning.eng.cam.ac.uk/zoubin/">Zoubin Ghahramani</a> in the <a href="http://mlg.eng.cam.ac.uk/">Machine Learning</a> group of the Cambridge University Engineering Department. I was the Roger Needham Scholar at Wolfson College, funded by Microsoft Research. My undergraduate degree comprised two years of Physics before switching to Engineering to complete an MEng with Zoubin. I took the <a href="http://www.bioinformatics.ic.ac.uk/">MSc Bioinformatics and Systems Biology</a> at <a href="http://www3.imperial.ac.uk/">Imperial College</a> in 2007/8. </p> 
+  <p>Here's a <a href="http://www.youtube.com/watch?v=qr6i_5Onj7k">video</a> of me and my friend Johan falling off cliffs on skis in Flaine, France. 
+<p>You can download my <a href="documents/david-knowles-resume.pdf">CV</a>.
+							</div> </section>
+						
+						<section id="staff"> <div>
+						 	<h4>Staff</h4>
+							<p>We are hiring a lab manager. You should have a degree in molecular biology, genetics or a related field, and 5 years of research experience. You'll have the opportunity to contribute scientifically to projects in the lab.</p>
+							</div> </section>
 							
+						<section id="postdocs"> <div>
+						 	<h4>Postdocs</h4>
+							<p>Two postdoc positions are available, one in machine learning for computational genomics (transcriptomics, variant interpretation, single cell analysis) and one in molecular genetics (forward genetic screens and reporter assays). Both positions have the option of being "damp" involving both wet and dry (computational) components.</p>
+							</div> </section>
+							
+						<section id="students"> <div>
+						 	<h4>PhD students</h4>
+							<p>If you're a student at Columbia University feel free to <a href="mailto:david.arthur.knowles@gmail.com">e-mail</a> me about rotating in the lab. If you're looking at PhD programmes please bear in mind you will need to apply through Columbia University <a href="https://www.cs.columbia.edu/">Computer Science</a> or <a href="https://systemsbiology.columbia.edu/">Systems Biology</a>.</p>
+							</div> </section>
+
 							</div> </section>
 
 						<!-- Three -->
