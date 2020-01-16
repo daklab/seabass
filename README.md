@@ -11,7 +11,9 @@ Photo by <https://unsplash.com/@davidhiggins>
 
 # Compile (Mac OS X)
 
-Set jabref preference to sort by original order. 
+Through the GUI set jabref preference to sort by original order. Create a new "export format" called "website" using "publications/jabref_list_layout/listrefs.layout". 
+
+Then on the command line:
 ```
 alias jabref='java -jar /Applications/JabRef.app/Contents/java/app/JabRef-4.0-beta3.jar'
 /publications/build_pubs.sh
