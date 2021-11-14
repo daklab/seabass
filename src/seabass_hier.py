@@ -10,54 +10,57 @@ from torch.distributions import constraints
 
 import numpy as np
 import pandas as pd
-from dataclasses import dataclass, field
-
+from dataclasses import dataclass
 import seabass
 
 @dataclass
-class ScreenData: 
-    gene_indices: torch.Tensor
-    genes: pd.Index
-    guide_indices: torch.Tensor
-    sgrnas: pd.Index    
-    logFC: torch.Tensor
-    timepoint: torch.Tensor
-    num_guides: int = field(default = 0, init = False)
-    num_genes: int = field(default = 0, init = False)
-    multiday: bool = field(default = False , init = False)
+class HierData(seabass.ScreenData): 
+    junction_indices: torch.Tensor
+    junctions: pd.Index
+    junc2gene: torch.Tensor
+    num_junctions: int = 0
     
     def __post_init__(self):
-        self.num_guides = max(self.guide_indices) + 1
-        self.num_genes = max(self.gene_indices) + 1
-        self.multiday = self.timepoint.std().item() > 0.
+        super().__post_init__()
+        self.num_junctions = max(self.junction_indices) + 1
         
     @staticmethod
     def from_pandas(df): 
         
         guide_indices, sgrnas = pd.factorize(df.sgrna) # make numeric
         gene_indices, genes = pd.factorize(df.gene)
-
-        return ScreenData(
+        junction_indices, junctions = pd.factorize(df.junction)
+        
+        junc2gene = pd.DataFrame({'junction_indices' : junction_indices, 
+                          'gene_indices' : gene_indices}).drop_duplicates()
+        assert(np.all(junc2gene.junction_indices == np.arange(junc2gene.shape[0])))
+        
+        return HierData(
             guide_indices = torch.tensor(guide_indices, dtype = torch.long),
+            junction_indices = torch.tensor(junction_indices, dtype = torch.long), 
             gene_indices = torch.tensor(gene_indices, dtype = torch.long), 
             logFC = torch.tensor(np.array(df.logFC), dtype = torch.float), 
             timepoint = torch.tensor(np.array(df.week), dtype = torch.float),
+            junc2gene = torch.tensor(np.array(junc2gene.gene_indices), dtype = torch.long), 
             sgrnas = sgrnas, 
+            junctions = junctions,
             genes = genes
         )
-
 # model definition 
 def model_base(data,
          efficacy_prior_a = 1., # shape1 of beta(a,b) prior on guide efficacy
          efficacy_prior_b = 1., # shape2 of beta(a,b) prior on guide efficacy
+         junc_efficacy_prior_a = 1., # shape1 of beta(a,b) prior on guide efficacy
+         junc_efficacy_prior_b = 1., # shape2 of beta(a,b) prior on guide efficacy
          sigma_noise = 1., # noise std estimated from non-targetting guides
          sigma_prior = 2. 
          ): 
-    """ Seabass model for genes (or junctions). 
+    """ Seabass model for junctions and genes. 
     
     guide_efficacy ~ Beta(efficacy_prior_a,efficacy_prior_b) for each guide
     gene_essentiality ~ Normal(0, sigma_prior^2) for each gene
-    log2FC = gene_essentiality * guide_efficacy [* timepoint] + noise
+    junction_efficacy ~ Beta(junc_efficacy_prior_a, junc_efficacy_prior_b): how `targettable` is this junction
+    log2FC = gene_essentiality * guide_efficacy * junction_efficacy [* timepoint] + noise
     noise ~ Normal(0, sigma_noise^2) 
     
     Parameters
@@ -73,41 +76,28 @@ def model_base(data,
         efficacy_prior_a = pyro.sample("efficacy_prior_a", efficacy_prior_a)
     if type(efficacy_prior_b) != float: 
         efficacy_prior_b = pyro.sample("efficacy_prior_b", efficacy_prior_b)
+    if type(junc_efficacy_prior_a) != float: 
+        junc_efficacy_prior_a = pyro.sample("junc_efficacy_prior_a", junc_efficacy_prior_a)
+    if type(junc_efficacy_prior_b) != float: 
+        junc_efficacy_prior_b = pyro.sample("junc_efficacy_prior_b", junc_efficacy_prior_b)
         
     guide_efficacy = pyro.sample("guide_efficacy", 
         dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)
     )
-
-    gene_essentiality = pyro.sample("gene_essentiality",
-        dist.Normal(0., sigma_prior).expand([data.num_genes]).to_event(1)
+    
+    junction_efficacy = pyro.sample("junction_efficacy", 
+        dist.Beta(junc_efficacy_prior_a, junc_efficacy_prior_b).expand([data.num_guides]).to_event(1)
     )
 
-    mean = gene_essentiality[data.gene_indices] * guide_efficacy[data.guide_indices]
+    gene_essentiality = pyro.sample("gene_essentiality",
+        dist.Normal(0., sigma_prior).expand([data.num_junctions]).to_event(1)
+    )
+
+    mean = gene_essentiality[data.gene_indices] * guide_efficacy[data.guide_indices] * junction_efficacy[data.junction_indices]
     if data.multiday: 
         mean *= data.timepoint 
     with pyro.plate("data", data.guide_indices.shape[0]):
         obs = pyro.sample("obs", dist.Normal(mean, sigma_noise), obs = data.logFC)
-
-def get_posterior_stats(model,
-                        guide, 
-                        data, 
-                        num_samples=100): 
-    """ extract posterior samples (somewhat weirdly this is done with `Predictive`) """
-    guide.requires_grad_(False)
-    predictive = Predictive(model, 
-                            guide=guide, 
-                            num_samples=num_samples) 
-
-    samples = predictive(data)
-
-    posterior_stats = { k : {
-                "mean": torch.mean(v, 0),
-                "std": torch.std(v, 0),
-                "5%": v.kthvalue(int(len(v) * 0.05), dim=0)[0],
-                "95%": v.kthvalue(int(len(v) * 0.95), dim=0)[0],
-            } for k, v in samples.items() }
-
-    return posterior_stats
 
 def fit(data,
        iterations = 1000,
@@ -119,18 +109,20 @@ def fit(data,
     model = lambda data:  model_base(data, 
          sigma_prior = dist.HalfCauchy(torch.tensor(2.)) if learn_sigma else 2., 
          efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
-         efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.
+         efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.,
+         junc_efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
+         junc_efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.
                                     )
     
     to_optimize = ["sigma_prior",
                    "efficacy_prior_a",
-                   "efficacy_prior_b"]
+                   "efficacy_prior_b",
+                  "junc_efficacy_prior_a",
+                  "junc_efficacy_prior_b"]
     
     guide = AutoGuideList(model)
     guide.add(AutoDiagonalNormal(poutine.block(model, hide = to_optimize)))
     guide.add(AutoDelta(poutine.block(model, expose = to_optimize)))
-    
-    #guide = AutoDiagonalNormal(model)
     
     adam = pyro.optim.Adam({"lr": lr})
     svi = SVI(model, guide, adam, loss=Trace_ELBO())

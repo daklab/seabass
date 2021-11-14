@@ -18,12 +18,10 @@ pyro.clear_param_store()
 data_dir = Path("/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/")
 dat = pd.read_csv(data_dir / "Cas13_essential_arm_foldchanges.txt", sep = "\t")
 
-# single day version
-day21 = dat[dat.day == "day21"].rename(columns={"Gene": "gene", "value": "logFC"})
-day21.iloc[:,[0,1,2,-2]]
-plt.hist(day21.logFC,100)
+dat = dat.rename(columns={"Gene": "junction", "value": "logFC"})
+plt.hist(dat.logFC,100)
 
-data = seabass.ScreenData.from_pandas(day21) 
+data = seabass.ScreenData.from_pandas(dat) 
 
 # for reproducibility
 pyro.set_rng_seed(101)
@@ -41,11 +39,11 @@ plt.show()
 
 # plot estimates
 plt.figure(figsize=(9,4))
-plt.subplot(131)
+plt.subplot(121)
 plt.hist( posterior_stats["guide_efficacy"]["mean"], 30 )
 plt.xlabel('guide_efficacy')
-plt.subplot(132)
-plt.hist( posterior_stats["gene_essentiality"]["mean"], 30 )
+plt.subplot(122)
+plt.hist( posterior_stats["junction_essentiality"]["mean"], 30 )
 plt.xlabel('junction_essentiality')
 plt.show() 
 
@@ -56,9 +54,10 @@ plt.xlabel('guide_efficacy mean')
 plt.ylabel('guide_efficacy std') 
 plt.show() 
 
-plt.scatter(posterior_stats["gene_essentiality"]["mean"], 
-            posterior_stats["gene_essentiality"]["std"], 
+plt.scatter(posterior_stats["junction_essentiality"]["mean"], 
+            posterior_stats["junction_essentiality"]["std"], 
             alpha = 0.05)
 plt.xlabel('junction_essentiality mean') 
 plt.ylabel('junction_essentiality std') 
 plt.show() 
+
