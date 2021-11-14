@@ -1,5 +1,8 @@
 import seabass
 import torch
+
+torch.set_num_threads(20)
+
 import matplotlib.pyplot as plt
 import sys
 import pyro
@@ -8,6 +11,8 @@ from pathlib import Path
 import numpy as np
 from importlib import reload  # Python 3.4+
 reload(seabass) 
+
+pyro.clear_param_store()
 
 # load data
 data_dir = Path("/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/")
@@ -29,19 +34,16 @@ data = seabass.OneDay(
 # for reproducibility
 pyro.set_rng_seed(101)
 
-model, guide, losses = seabass.fit(data, iterations=101)
+model, guide, losses = seabass.fit(data, iterations=5000)
 
-posterior_stats = model.get_posterior_stats(guide, data)
+posterior_stats = seabass.get_posterior_stats(model, guide, data)
 
 # check convergence
 plt.figure(figsize=(9,4))
-plt.subplot(121)
 plt.plot(losses)
 plt.ylabel("ELBO")
 plt.xlabel("Iterations")
-plt.subplot(122)
-plt.plot(np.arange(1000,5000), losses[1000:]) # seems converged after ~2000 
-plt.xlabel("Iterations")
+plt.show()
 
 
 # plot estimates
