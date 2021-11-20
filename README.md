@@ -1,6 +1,11 @@
 # Splicing screen Efficacy Analysis with BAyesian StatisticS
 
-TODO
+## To run current version of seabass (hier_alt.py)
+```python run_hier_alt.py ['cas13_LFCS_guides'] ['name_analysis']```
+
+- this will generate an output directory with posterior values for guides, junctions and genes as well as summary plots 
+
+## TODO
 - multiple days
 - deal with bimodality: are these just 0s? (use Harm's pipeline? Let Karin do this)
 - learn prior on efficacy? Beta prior done. mixture?
