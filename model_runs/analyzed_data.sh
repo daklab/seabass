@@ -16,7 +16,7 @@ python $seabass_run $input_file $name_analysis $output_dir
 
 #2. Same as above but without replicate 1 values 
 input_file=/gpfs/commons/groups/knowles_lab/Cas13Karin/data/2021-11-21_HWcode_screen_R1_remove/2021-11-21_R1_remove_KI_LFC_all_guides_Harm_Code.txt.gz
-name_analysis=R1_include_HW_code
+name_analysis=R1_remove_HW_code
 output_dir=/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/seabass/
 
 python $seabass_run $input_file $name_analysis $output_dir
