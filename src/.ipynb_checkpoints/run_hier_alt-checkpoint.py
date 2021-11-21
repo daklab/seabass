@@ -33,7 +33,27 @@ reload(hier_alt)
 pyro.clear_param_store()
 
 #------------------------------------------------------------------
-#load data 
+#functions for plotting  
+#------------------------------------------------------------------
+
+#def my_plot(location_dataset, min_temperature, max_temperature):
+#    condition = (location_dataset['temperature'] > min_temperature) & (dataset['temperature'] <= max_temperature)
+#    subset = location_dataset[condition] # subset the data based on the temperature range
+
+#    x = subset['precipitation'] # takes the precipitation column only
+    # N.B. referenca taken to fig
+#    fig = plt.figure(figsize=(8, 6))
+#    plt.plot(x)
+#    plt.show()
+
+#    return fig
+#fig = my_plot(...)
+#fig.savefig("somefile.png")
+
+#------------------------------------------------------------------
+#load data (the processing here will eventually be done in the 
+#making of the input file)
+#input file will be an arguement given to the script 
 #------------------------------------------------------------------
 
 #parse arguements to get data input file with log fold changes 
@@ -41,13 +61,29 @@ data_dir = Path("/gpfs/commons/groups/knowles_lab/Cas13Karin/data/")
 dat = pd.read_csv(data_dir / "2021-11-19_KI_LFC_all_guides_Harm_Code.txt.gz", sep = " ")
 
 #rename column names so they match seabass data object 
-dat = dat.rename(columns={"Gene": "junction", 
+dat = dat.rename(columns={"junc.name": "junction", 
                           "guide.id" : "sgrna",
                           "gene.name" : "gene", 
                           "value": "logFC"})
-plt.hist(dat.logFC,100)
+
+#keep only essential and common junctions 
+dat = dat[dat["junc.type"]=="common"] 
+dat = dat[dat["type"]=="essential"] 
+
+#make week numerical value 
+dat["week"]=1 
+dat["week"][dat["day"]=="D14"] = 2
+dat["week"][dat["day"]=="D21"] = 3
+
+#------------------------------------------------------------------
+#get seabass Hier Data object from input dataset 
+#------------------------------------------------------------------
 
 data = seabass_hier.HierData.from_pandas(dat) 
+
+#------------------------------------------------------------------
+#run model 
+#------------------------------------------------------------------
 
 # for reproducibility
 pyro.set_rng_seed(101)
