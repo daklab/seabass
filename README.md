@@ -3,8 +3,6 @@
 ## To run current version of seabass (hier_alt.py)
 ```python run_hier_alt.py ['cas13_LFCS_guides'] ['name_analysis'] ['output_directory']```
 
-python /gpfs/commons/home/kisaev/seabass/src/run_hier_alt.py $file_name noR1 /gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/seabass/
-
 - this will generate an output directory with posterior values for guides, junctions and genes as well as summary plots 
 
 ## TODO
