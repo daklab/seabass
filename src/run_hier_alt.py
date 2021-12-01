@@ -4,7 +4,7 @@
 
 #set working directory to git folder on the cluster 
 import os
-os.chdir('/gpfs/commons/home/kisaev/seabass/src/')
+os.chdir(os.path.expanduser('~/seabass/src/'))
 
 # Print the current working directory
 print("Current working directory: {0}".format(os.getcwd()))
@@ -41,19 +41,27 @@ parser.add_argument("input_file")
 parser.add_argument("analysis_name")
 parser.add_argument("output_dir_name")
 
-args = parser.parse_args()
-input_file=args.input_file
-analysis_name=args.analysis_name
-output_dir=args.output_dir_name
+import __main__
+is_interactive = not hasattr(__main__, '__file__')
+if is_interactive: 
+    input_file = "/gpfs/commons/groups/knowles_lab/Cas13Karin/data/2021-11-21_HWcode_screen_R1_include/2021-11-21_R1_include_KI_LFC_all_guides_Harm_Code.txt.gz"
+    analysis_name = "R1_include_HW_code"
+    output_dir = os.path.expanduser('~/seabass/model_runs/')
+else: 
+    args = parser.parse_args()
+    input_file=args.input_file
+    analysis_name=args.analysis_name
+    output_dir=args.output_dir_name
 
 print(input_file)
 print(output_dir)
 print(analysis_name)
 
 #create directory for output files with date
-mydir = os.path.join(output_dir, analysis_name, datetime.datetime.now().strftime('%Y_%m_%d_%H-%M-%S'))
-os.makedirs(mydir,exist_ok=True)
-print("Directory '% s' created" % mydir)
+results_dir = Path(output_dir) / analysis_name / datetime.datetime.now().strftime('%Y_%m_%d_%H-%M-%S')
+results_dir.mkdir(parents=True, exist_ok=True)
+
+print("Directory '% s' created" % results_dir)
 
 #------------------------------------------------------------------
 #functions for plotting (to add)
@@ -81,7 +89,7 @@ dat = dat[dat["type"]=="essential"]
 #get seabass Hier Data object from input dataset 
 #------------------------------------------------------------------
 
-data = seabass_hier.HierData.from_pandas(essential) 
+data = seabass_hier.HierData.from_pandas(dat) 
 
 #------------------------------------------------------------------
 #run model 
@@ -98,16 +106,13 @@ posterior_stats = seabass.get_posterior_stats(model, guide, data) # can alternat
 #save results
 #------------------------------------------------------------------
 
-#change directory to output and save files there 
-os.chdir(mydir)
-print("Current working directory: {0}".format(os.getcwd()))
-
 # check convergence
-plt.figure(figsize=(9,4))
+plt.figure(figsize=(5,4))
 plt.plot(losses)
 plt.ylabel("ELBO")
 plt.xlabel("Iterations")
-plt.savefig("convergence.png")
+plt.savefig(results_dir / "convergence.png")
+plt.show()
 
 # plot estimates
 plt.figure(figsize=(9,8))
@@ -120,7 +125,8 @@ plt.xlabel('junction_efficacy')
 plt.subplot(223)
 plt.hist( posterior_stats["gene_essentiality"]["mean"], 30 )
 plt.xlabel('gene_essentiality')
-plt.savefig("estimates.png")
+plt.savefig(results_dir / "estimates.png")
+plt.show()
 
 # plot guide mean vs std efficacy 
 plt.scatter(posterior_stats["guide_efficacy"]["mean"], 
@@ -128,7 +134,8 @@ plt.scatter(posterior_stats["guide_efficacy"]["mean"],
             alpha = 0.05)
 plt.xlabel('guide_efficacy mean') 
 plt.ylabel('guide_efficacy std') 
-plt.savefig("guide_efficacy.png")
+plt.savefig(results_dir / "guide_efficacy.png")
+plt.show()
 
 # plot junction mean vs std essentiality 
 plt.scatter(posterior_stats["junction_essentiality"]["mean"], 
@@ -136,7 +143,8 @@ plt.scatter(posterior_stats["junction_essentiality"]["mean"],
             alpha = 0.05)
 plt.xlabel('junction_essentiality mean') 
 plt.ylabel('junction_essentiality std') 
-plt.savefig("junction_essentiality.png")
+plt.savefig(results_dir / "junction_essentiality.png")
+plt.show()
 
 #save gene essentiality estimates 
 x=posterior_stats["gene_essentiality"]["mean"]
@@ -145,6 +153,6 @@ px["gene"] = data.genes.values
 px.columns = ['gene_essentiality', 'gene']
 
 px = px.sort_values(by=['gene_essentiality'])
-px.to_csv('gene_essentiality_estimates.csv', index=False)
+px.to_csv(results_dir / 'gene_essentiality_estimates.csv', index=False)
 
 print("done")
