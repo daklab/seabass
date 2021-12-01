@@ -80,7 +80,6 @@ dat = dat[dat["type"]=="essential"]
 #------------------------------------------------------------------
 #get seabass Hier Data object from input dataset 
 #------------------------------------------------------------------
->>>>>>> origin/karin_inference
 
 data = seabass_hier.HierData.from_pandas(essential) 
 
