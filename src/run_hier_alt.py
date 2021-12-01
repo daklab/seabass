@@ -147,12 +147,47 @@ plt.savefig(results_dir / "junction_essentiality.png")
 plt.show()
 
 #save gene essentiality estimates 
-x=posterior_stats["gene_essentiality"]["mean"]
-px = pd.DataFrame(x.numpy()).T
-px["gene"] = data.genes.values
-px.columns = ['gene_essentiality', 'gene']
+ge = posterior_stats["gene_essentiality"]["mean"].numpy().flatten()
+px = pd.DataFrame({"gene_essentiality" : ge, "gene" : data.genes.values})
 
 px = px.sort_values(by=['gene_essentiality'])
 px.to_csv(results_dir / 'gene_essentiality_estimates.csv', index=False)
+
+gecko = pd.read_csv("/gpfs/commons/home/mschertzer/cas_library/achilles_geckoV2_19Q4.csv.gz")
+gecko = gecko.rename({'Unnamed: 0':'gene'}, axis=1)
+gecko = gecko[ ['gene', 'A375_SKIN'] ]
+
+merged = pd.merge( gecko, px, on = "gene" )
+plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
+import scipy.stats
+scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )[0]
+
+rna_i = pd.read_csv("/gpfs/commons/groups/knowles_lab/Cas13Karin/data/A375_public_screens/D2_combined_gene_dep_scores.csv")
+rna_i = rna_i.rename({'Unnamed: 0':'gene'}, axis=1)
+rna_i = rna_i[ ['gene', 'A375_SKIN'] ]
+rna_i.gene = rna_i.gene.str.split(" ", expand=True).iloc[:,0]
+
+merged = pd.merge( rna_i, px, on = "gene" )
+plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
+scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )[0]
+
+je = posterior_stats["junction_essentiality"]["mean"].flatten()
+
+num_genes = data.junc2gene.max()+1
+gene_scores = {
+    "max_je" : np.array( [ je.flatten()[data.junc2gene == i].max().item() for i in np.arange(num_genes) ] ), 
+    "min_je" : np.array([ je.flatten()[data.junc2gene == i].min().item() for i in np.arange(num_genes) ]), 
+    "mean_je" : np.array([ je.flatten()[data.junc2gene == i].mean().item() for i in np.arange(num_genes) ]), 
+    "ge" : ge 
+}
+
+plt.figure(figsize=(9,8))
+for i,(k,v) in enumerate(gene_scores.items()): 
+    px = pd.DataFrame( {"gene_essentiality" : v, "gene" : data.genes.values} )
+    merged = pd.merge( rna_i, px, on = "gene" )
+    plt.subplot(2,2,i+1)
+    plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
+    r,_ = scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )
+    plt.title("%s Pearson R=%.3f" % (k, r))
 
 print("done")
