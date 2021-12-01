@@ -22,7 +22,7 @@ def model_base(data,
          ): 
     """ Seabass model for junctions and genes. 
     
-    guide_efficacy ~ Beta(a,b) for each guide
+    guide_efficacy ~ Beta(efficacy_prior_a,efficacy_prior_b) for each guide
     gene_essentiality ~ Normal(0, sigma_prior^2) for each gene
     junction_essentiality ~ Normal(gene_essentiality, junction_essentiality_std^2) matching junctions to genes
     log2FC = junction_essentiality * guide_efficacy [* timepoint] + noise

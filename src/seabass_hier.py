@@ -104,14 +104,15 @@ def fit(data,
        print_every = 100,
        lr = 0.03,
        learn_sigma = True, 
-       learn_efficacy_prior = True): 
+       learn_efficacy_prior = True,
+       learn_junction_prior = True): 
     
     model = lambda data:  model_base(data, 
          sigma_prior = dist.HalfCauchy(torch.tensor(2.)) if learn_sigma else 2., 
          efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
          efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.,
-         junc_efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
-         junc_efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.
+         junc_efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_junction_prior else 1., 
+         junc_efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_junction_prior else 1.
                                     )
     
     to_optimize = ["sigma_prior",

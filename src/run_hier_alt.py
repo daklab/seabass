@@ -19,15 +19,25 @@ reload(hier_alt)
 pyro.clear_param_store()
 
 # load data
-data_dir = Path("/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/")
-dat = pd.read_csv(data_dir / "Cas13_essential_arm_foldchanges.txt", sep = "\t")
+if False: 
+    data_dir = Path("/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/")
+    dat = pd.read_csv(data_dir / "Cas13_essential_arm_foldchanges.txt", sep = "\t")
+    dat = dat.rename(columns={"Gene": "junction", 
+                              "gene.name" : "gene", 
+                              "value": "logFC"})
+else: 
+    dat = pd.read_csv("/gpfs/commons/groups/knowles_lab/Cas13Karin/data/2021-11-19_KI_LFC_all_guides_Harm_Code.txt.gz", sep = " ")
+    dat = dat.rename(columns={"junc.name": "junction", 
+                              "gene.name" : "gene", 
+                              "value": "logFC", 
+                             "guide.id" : "sgrna"})
+    week, timepoints = pd.factorize(dat.day)
+    dat["week"] = week + 1
+    essential = dat.loc[dat.type == "essential",]
 
-dat = dat.rename(columns={"Gene": "junction", 
-                          "gene.name" : "gene", 
-                          "value": "logFC"})
 plt.hist(dat.logFC,100)
 
-data = seabass_hier.HierData.from_pandas(dat) 
+data = seabass_hier.HierData.from_pandas(essential) 
 
 # for reproducibility
 pyro.set_rng_seed(101)
