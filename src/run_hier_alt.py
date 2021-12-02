@@ -41,18 +41,23 @@ parser.add_argument("input_file")
 parser.add_argument("analysis_name")
 parser.add_argument("output_dir_name")
 
+parser.add_argument("--multiday", action='store_true')
+
 import __main__
 is_interactive = not hasattr(__main__, '__file__')
 if is_interactive: 
     input_file = "/gpfs/commons/groups/knowles_lab/Cas13Karin/data/2021-11-21_HWcode_screen_R1_include/2021-11-21_R1_include_KI_LFC_all_guides_Harm_Code.txt.gz"
     analysis_name = "R1_include_HW_code"
+    multiday = False
     output_dir = os.path.expanduser('~/seabass/model_runs/')
 else: 
     args = parser.parse_args()
     input_file=args.input_file
     analysis_name=args.analysis_name
     output_dir=args.output_dir_name
+    multiday = args.multiday
 
+analysis_name += "_multiday" if multiday else "_day21"
 print(input_file)
 print(output_dir)
 print(analysis_name)
@@ -82,6 +87,9 @@ dat = pd.read_csv(input_file, sep = " ")
 #keep only essential and common junctions 
 dat = dat[dat["junc.type"]=="common"] 
 dat = dat[dat["type"]=="essential"] 
+
+if not multiday: 
+    dat = dat[dat.week==3] 
 
 #essential gene scores (add file so can look at correlation)
 
@@ -189,5 +197,9 @@ for i,(k,v) in enumerate(gene_scores.items()):
     plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
     r,_ = scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )
     plt.title("%s Pearson R=%.3f" % (k, r))
+    if i>=2 : plt.xlabel("RNAi")
+    if i%2 == 0: plt.ylabel("Cas13")
+plt.savefig(results_dir / "vs_rna_i.pdf")
+plt.show()
 
 print("done")

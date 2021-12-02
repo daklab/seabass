@@ -36,6 +36,9 @@ class ScreenData:
         
         guide_indices, sgrnas = pd.factorize(df.sgrna) # make numeric
         gene_indices, genes = pd.factorize(df.gene)
+        
+        if df.week.std() == 0: 
+            df.week[:] = 1
 
         return ScreenData(
             guide_indices = torch.tensor(guide_indices, dtype = torch.long),

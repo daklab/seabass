@@ -35,6 +35,9 @@ class HierData(seabass.ScreenData):
                           'gene_indices' : gene_indices}).drop_duplicates()
         assert(np.all(junc2gene.junction_indices == np.arange(junc2gene.shape[0])))
         
+        if df.week.std() == 0: 
+            df.week[:] = 1
+        
         return HierData(
             guide_indices = torch.tensor(guide_indices, dtype = torch.long),
             junction_indices = torch.tensor(junction_indices, dtype = torch.long), 
