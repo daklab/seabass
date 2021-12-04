@@ -37,13 +37,14 @@ import datetime
 parser = argparse.ArgumentParser()
 
 #input file with LFCs
+parser.add_argument("model") # gene, hier, hier_alt
 parser.add_argument("input_file")
 parser.add_argument("analysis_name")
 parser.add_argument("output_dir_name")
 
 parser.add_argument("--multiday", action='store_true')
 
-parser.add_argument("--hier", action='store_true')
+parser.add_argument("--model", action='store_true')
 
 import __main__
 is_interactive = not hasattr(__main__, '__file__')
@@ -52,8 +53,11 @@ if is_interactive:
     input_file = "/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/Cas13_essential_arm_foldchanges_rename.txt"
     #analysis_name = "R1_include_HW_code"
     analysis_name = "MAGECK_includeR1"
+    renamer = None
+    if analysis_name == "MAGECK_includeR1": 
+        renamer = {"gene" : "junction", "gene.name" : "gene"}
     multiday = True
-    hier = False
+    model_type = "hier_alt"
     output_dir = os.path.expanduser('~/seabass/model_runs/')
 else: 
     args = parser.parse_args()
@@ -61,7 +65,9 @@ else:
     analysis_name=args.analysis_name
     output_dir=args.output_dir_name
     multiday = args.multiday
-    hier = args.hier
+    model_type = args.model
+    
+hier = model_type != "gene"
 
 analysis_name += "_multiday" if multiday else "_day21"
 analysis_name += "_hier" if hier else "_nonhier"
@@ -91,7 +97,7 @@ print("Directory '% s' created" % results_dir)
 
 #parse arguements to get data input file with log fold changes 
 dat = pd.read_csv(input_file, sep = " ")
-
+if renamer: dat = dat.rename(columns = renamer) 
 #keep only essential and common junctions 
 if "junc.type" in dat: dat = dat[dat["junc.type"]=="common"] 
 if "type" in dat: dat = dat[dat["type"]=="essential"] 
@@ -112,7 +118,10 @@ pyro.set_rng_seed(101)
 
 if hier: 
     data = seabass_hier.HierData.from_pandas(dat) 
-    model, guide, losses = hier_alt.fit(data, iterations=3000)
+    if model_type == "hier_alt": 
+        model, guide, losses = hier_alt.fit(data, iterations=3000)
+    else: 
+        model, guide, losses = seabass_hier.fit(data, iterations=3000)
 else: 
     data = seabass.ScreenData.from_pandas(dat) 
     model, guide, losses = seabass.fit(data, 
@@ -141,8 +150,8 @@ plt.hist( posterior_stats["guide_efficacy"]["mean"], 30 )
 plt.xlabel('guide_efficacy')
 if hier: 
     plt.subplot(222)
-    plt.hist( posterior_stats["junction_essentiality"]["mean"], 30 )
-    plt.xlabel('junction_efficacy')
+    plt.hist( posterior_stats["junction_score"]["mean"], 30 )
+    plt.xlabel('junction_scorey')
 plt.subplot(223)
 plt.hist( posterior_stats["gene_essentiality"]["mean"], 30 )
 plt.xlabel('gene_essentiality')
@@ -160,12 +169,12 @@ plt.show()
 
 # plot junction mean vs std essentiality 
 if hier:
-    plt.scatter(posterior_stats["junction_essentiality"]["mean"], 
-                posterior_stats["junction_essentiality"]["std"], 
+    plt.scatter(posterior_stats["junction_score"]["mean"], 
+                posterior_stats["junction_score"]["std"], 
                 alpha = 0.05)
-    plt.xlabel('junction_essentiality mean') 
-    plt.ylabel('junction_essentiality std') 
-    plt.savefig(results_dir / "junction_essentiality.png")
+    plt.xlabel('junction_score mean') 
+    plt.ylabel('junction_score std') 
+    plt.savefig(results_dir / "junction_score.png")
     plt.show()
     
 plt.scatter(posterior_stats["gene_essentiality"]["mean"], 
@@ -205,7 +214,7 @@ plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
 scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )[0]
 
 if hier: 
-    je = posterior_stats["junction_essentiality"]["mean"].flatten()
+    je = posterior_stats["junction_score"]["mean"].flatten()
     
     if False: # map mageck data from junctions to genes
         data = seabass_hier.HierData.from_pandas(dat.rename(columns = {"gene" : "junction", "gene.name" : "gene"}))

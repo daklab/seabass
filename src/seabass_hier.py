@@ -88,7 +88,7 @@ def model_base(data,
         dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)
     )
     
-    junction_efficacy = pyro.sample("junction_efficacy", 
+    junction_score = pyro.sample("junction_score", 
         dist.Beta(junc_efficacy_prior_a, junc_efficacy_prior_b).expand([data.num_guides]).to_event(1)
     )
 
@@ -96,7 +96,7 @@ def model_base(data,
         dist.Normal(0., sigma_prior).expand([data.num_junctions]).to_event(1)
     )
 
-    mean = gene_essentiality[data.gene_indices] * guide_efficacy[data.guide_indices] * junction_efficacy[data.junction_indices]
+    mean = gene_essentiality[data.gene_indices] * guide_efficacy[data.guide_indices] * junction_score[data.junction_indices]
     if data.multiday: 
         mean *= data.timepoint 
     with pyro.plate("data", data.guide_indices.shape[0]):

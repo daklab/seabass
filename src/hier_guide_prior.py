@@ -14,15 +14,13 @@ from dataclasses import dataclass
 import seabass
 
 def model_base(data,
-         efficacy_prior_a = 1., # shape1 of beta(a,b) prior on guide efficacy
-         efficacy_prior_b = 1., # shape2 of beta(a,b) prior on guide efficacy
          junction_std = 1., # junc ~ N(gene, std^2)
          sigma_noise = 1., # noise std estimated from non-targetting guides
          sigma_prior = 2. 
          ): 
     """ Seabass model for junctions and genes. 
     
-    guide_efficacy ~ Beta(efficacy_prior_a,efficacy_prior_b) for each guide
+    guide_efficacy ~ Normal(a * predicted_eff + b, efficacy_std) for each guide
     gene_essentiality ~ Normal(0, sigma_prior^2) for each gene
     junction_essentiality ~ Normal(gene_essentiality, junction_std^2) matching junctions to genes
     log2FC = junction_essentiality * guide_efficacy [* timepoint] + noise
@@ -37,15 +35,15 @@ def model_base(data,
 
     if type(sigma_prior) != float: 
         sigma_prior = pyro.sample("sigma_prior", sigma_prior)
-    if type(efficacy_prior_a) != float: 
-        efficacy_prior_a = pyro.sample("efficacy_prior_a", efficacy_prior_a)
-    if type(efficacy_prior_b) != float: 
-        efficacy_prior_b = pyro.sample("efficacy_prior_b", efficacy_prior_b)
     if type(junction_std) != float: 
         junction_std = pyro.sample("junction_std", junction_std)
+        
+    guide_a = pyro.sample("guide_a", dist.Normal(1, 1).to_event(1) )
+    guide_b = pyro.sample("guide_b", dist.Normal(0, 1).to_event(1) )
+    efficacy_std = pyro.sample("efficacy_std", dist.HalfCauchy(torch.tensor(2.)).to_event(1) )
     
     guide_efficacy = pyro.sample("guide_efficacy", 
-        dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)
+        dist.Normal(guide_a * data.predicted_guide_eff + guide_b, efficacy_std).to_event(1)
     )
     
     gene_essentiality = pyro.sample("gene_essentiality",
@@ -56,7 +54,7 @@ def model_base(data,
         dist.Normal(gene_essentiality[data.junc2gene], junction_std).to_event(1)
     )
 
-    mean = junction_score[data.junction_indices] * guide_efficacy[data.guide_indices] 
+    mean = junction_score[data.junction_indices] * torch.logit(guide_efficacy[data.guide_indices])
     if data.multiday: 
         mean *= data.timepoint 
     with pyro.plate("data", data.guide_indices.shape[0]):
@@ -67,19 +65,16 @@ def fit(data,
        print_every = 100,
        lr = 0.03,
        learn_sigma = True, 
-       learn_efficacy_prior = True,
        learn_junc_std = True): 
     
     model = lambda data:  model_base(data, 
          sigma_prior = dist.HalfCauchy(torch.tensor(2.)) if learn_sigma else 2., 
-         efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
-         efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.,
-         junction_std = dist.HalfCauchy(torch.tensor(1.)) if learn_junc_std else 1., 
+         junction_essentiality_std = dist.HalfCauchy(torch.tensor(1.)) if learn_junc_std else 1., 
                                     )
-    
     to_optimize = ["sigma_prior",
-                   "efficacy_prior_a",
-                   "efficacy_prior_b",
+                   "guide_a",
+                   "guide_b",
+                   "efficacy_std",
                   "junction_std"]
     
     guide = AutoGuideList(model)
