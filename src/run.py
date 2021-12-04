@@ -17,9 +17,11 @@ pyro.clear_param_store()
 # load data
 data_dir = Path("/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/")
 dat = pd.read_csv(data_dir / "Cas13_essential_arm_foldchanges.txt", sep = "\t")
+dat = dat.rename(columns={"Gene": "gene", "value": "logFC"})
+dat.to_csv(data_dir / "Cas13_essential_arm_foldchanges_rename.txt", sep = " ")
 
 # single day version
-day21 = dat[dat.day == "day21"].rename(columns={"Gene": "gene", "value": "logFC"})
+day21 = dat[dat.day == "day21"]
 day21.iloc[:,[0,1,2,-2]]
 plt.hist(day21.logFC,100)
 

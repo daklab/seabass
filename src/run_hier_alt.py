@@ -43,12 +43,17 @@ parser.add_argument("output_dir_name")
 
 parser.add_argument("--multiday", action='store_true')
 
+parser.add_argument("--hier", action='store_true')
+
 import __main__
 is_interactive = not hasattr(__main__, '__file__')
 if is_interactive: 
-    input_file = "/gpfs/commons/groups/knowles_lab/Cas13Karin/data/2021-11-21_HWcode_screen_R1_include/2021-11-21_R1_include_KI_LFC_all_guides_Harm_Code.txt.gz"
-    analysis_name = "R1_include_HW_code"
-    multiday = False
+    #input_file = "/gpfs/commons/groups/knowles_lab/Cas13Karin/data/2021-11-21_HWcode_screen_R1_include/2021-11-21_R1_include_KI_LFC_all_guides_Harm_Code.txt.gz"
+    input_file = "/gpfs/commons/groups/knowles_lab/Cas13Karin/analysis/Cas13_essential_arm_foldchanges_rename.txt"
+    #analysis_name = "R1_include_HW_code"
+    analysis_name = "MAGECK_includeR1"
+    multiday = True
+    hier = False
     output_dir = os.path.expanduser('~/seabass/model_runs/')
 else: 
     args = parser.parse_args()
@@ -56,8 +61,11 @@ else:
     analysis_name=args.analysis_name
     output_dir=args.output_dir_name
     multiday = args.multiday
+    hier = args.hier
 
 analysis_name += "_multiday" if multiday else "_day21"
+analysis_name += "_hier" if hier else "_nonhier"
+
 print(input_file)
 print(output_dir)
 print(analysis_name)
@@ -85,29 +93,33 @@ print("Directory '% s' created" % results_dir)
 dat = pd.read_csv(input_file, sep = " ")
 
 #keep only essential and common junctions 
-dat = dat[dat["junc.type"]=="common"] 
-dat = dat[dat["type"]=="essential"] 
+if "junc.type" in dat: dat = dat[dat["junc.type"]=="common"] 
+if "type" in dat: dat = dat[dat["type"]=="essential"] 
 
 if not multiday: 
     dat = dat[dat.week==3] 
 
 #essential gene scores (add file so can look at correlation)
 
-#------------------------------------------------------------------
-#get seabass Hier Data object from input dataset 
-#------------------------------------------------------------------
-
-data = seabass_hier.HierData.from_pandas(dat) 
-
-#------------------------------------------------------------------
-#run model 
-#------------------------------------------------------------------
 
 # for reproducibility
 pyro.set_rng_seed(101)
 
-model, guide, losses = hier_alt.fit(data, iterations=3000)
 
+#------------------------------------------------------------------
+#get seabass Hier Data object from input dataset and run model 
+#------------------------------------------------------------------
+
+if hier: 
+    data = seabass_hier.HierData.from_pandas(dat) 
+    model, guide, losses = hier_alt.fit(data, iterations=3000)
+else: 
+    data = seabass.ScreenData.from_pandas(dat) 
+    model, guide, losses = seabass.fit(data, 
+                                       iterations=3000,
+                                       learn_efficacy_prior = False,
+                                       learn_sigma = False)
+    
 posterior_stats = seabass.get_posterior_stats(model, guide, data) # can alternatively use guide.median()
 
 #------------------------------------------------------------------
@@ -127,9 +139,10 @@ plt.figure(figsize=(9,8))
 plt.subplot(221)
 plt.hist( posterior_stats["guide_efficacy"]["mean"], 30 )
 plt.xlabel('guide_efficacy')
-plt.subplot(222)
-plt.hist( posterior_stats["junction_essentiality"]["mean"], 30 )
-plt.xlabel('junction_efficacy')
+if hier: 
+    plt.subplot(222)
+    plt.hist( posterior_stats["junction_essentiality"]["mean"], 30 )
+    plt.xlabel('junction_efficacy')
 plt.subplot(223)
 plt.hist( posterior_stats["gene_essentiality"]["mean"], 30 )
 plt.xlabel('gene_essentiality')
@@ -146,12 +159,21 @@ plt.savefig(results_dir / "guide_efficacy.png")
 plt.show()
 
 # plot junction mean vs std essentiality 
-plt.scatter(posterior_stats["junction_essentiality"]["mean"], 
-            posterior_stats["junction_essentiality"]["std"], 
+if hier:
+    plt.scatter(posterior_stats["junction_essentiality"]["mean"], 
+                posterior_stats["junction_essentiality"]["std"], 
+                alpha = 0.05)
+    plt.xlabel('junction_essentiality mean') 
+    plt.ylabel('junction_essentiality std') 
+    plt.savefig(results_dir / "junction_essentiality.png")
+    plt.show()
+    
+plt.scatter(posterior_stats["gene_essentiality"]["mean"], 
+            posterior_stats["gene_essentiality"]["std"], 
             alpha = 0.05)
-plt.xlabel('junction_essentiality mean') 
-plt.ylabel('junction_essentiality std') 
-plt.savefig(results_dir / "junction_essentiality.png")
+plt.xlabel('gene_essentiality mean') 
+plt.ylabel('gene_essentiality std') 
+plt.savefig(results_dir / "gene_essentiality.pdf")
 plt.show()
 
 #save gene essentiality estimates 
@@ -165,10 +187,13 @@ gecko = pd.read_csv("/gpfs/commons/home/mschertzer/cas_library/achilles_geckoV2_
 gecko = gecko.rename({'Unnamed: 0':'gene'}, axis=1)
 gecko = gecko[ ['gene', 'A375_SKIN'] ]
 
+
 merged = pd.merge( gecko, px, on = "gene" )
 plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
 import scipy.stats
 scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )[0]
+plt.savefig(results_dir / "ge_vs_rna_i.pdf")
+plt.show()
 
 rna_i = pd.read_csv("/gpfs/commons/groups/knowles_lab/Cas13Karin/data/A375_public_screens/D2_combined_gene_dep_scores.csv")
 rna_i = rna_i.rename({'Unnamed: 0':'gene'}, axis=1)
@@ -179,27 +204,47 @@ merged = pd.merge( rna_i, px, on = "gene" )
 plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
 scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )[0]
 
-je = posterior_stats["junction_essentiality"]["mean"].flatten()
+if hier: 
+    je = posterior_stats["junction_essentiality"]["mean"].flatten()
+    
+    if False: # map mageck data from junctions to genes
+        data = seabass_hier.HierData.from_pandas(dat.rename(columns = {"gene" : "junction", "gene.name" : "gene"}))
+        je = posterior_stats["gene_essentiality"]["mean"].flatten()
+    
+    num_genes = data.junc2gene.max()+1
+    gene_scores = {
+        "max_je" : np.array( [ je.flatten()[data.junc2gene == i].max().item() for i in np.arange(num_genes) ] ), 
+        "min_je" : np.array([ je.flatten()[data.junc2gene == i].min().item() for i in np.arange(num_genes) ]), 
+        "mean_je" : np.array([ je.flatten()[data.junc2gene == i].mean().item() for i in np.arange(num_genes) ]), 
+        "ge" : ge 
+    }
 
-num_genes = data.junc2gene.max()+1
-gene_scores = {
-    "max_je" : np.array( [ je.flatten()[data.junc2gene == i].max().item() for i in np.arange(num_genes) ] ), 
-    "min_je" : np.array([ je.flatten()[data.junc2gene == i].min().item() for i in np.arange(num_genes) ]), 
-    "mean_je" : np.array([ je.flatten()[data.junc2gene == i].mean().item() for i in np.arange(num_genes) ]), 
-    "ge" : ge 
-}
-
-plt.figure(figsize=(9,8))
-for i,(k,v) in enumerate(gene_scores.items()): 
-    px = pd.DataFrame( {"gene_essentiality" : v, "gene" : data.genes.values} )
-    merged = pd.merge( rna_i, px, on = "gene" )
-    plt.subplot(2,2,i+1)
-    plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
-    r,_ = scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )
-    plt.title("%s Pearson R=%.3f" % (k, r))
-    if i>=2 : plt.xlabel("RNAi")
-    if i%2 == 0: plt.ylabel("Cas13")
-plt.savefig(results_dir / "vs_rna_i.pdf")
-plt.show()
+    plt.figure(figsize=(9,8))
+    for i,(k,v) in enumerate(gene_scores.items()): 
+        px = pd.DataFrame( {"gene_essentiality" : v, "gene" : data.genes.values} )
+        merged = pd.merge( rna_i, px, on = "gene" )
+        plt.subplot(2,2,i+1)
+        plt.scatter(merged['A375_SKIN'], merged['gene_essentiality'])
+        r,_ = scipy.stats.pearsonr( merged['A375_SKIN'], merged['gene_essentiality'] )
+        plt.title("%s Pearson R=%.3f" % (k, r))
+        if i>=2 : plt.xlabel("RNAi")
+        if i%2 == 0: plt.ylabel("Cas13")
+    plt.savefig(results_dir / "vs_rna_i.pdf")
+    plt.show()
 
 print("done")
+
+
+if False: 
+    dat_sim = dat.copy()
+    dat_sim.logFC = np.random.normal(scale = 2, size = dat.shape[0])
+    data_sim = seabass.ScreenData.from_pandas(dat_sim) 
+
+    # for reproducibility
+    pyro.set_rng_seed(101)
+
+    model, guide, losses = seabass.fit(data_sim, iterations=1000)
+
+    posterior_stats = seabass.get_posterior_stats(model, guide, data)
+
+    plt.hist(posterior_stats['gene_essentiality']['mean'],100)
