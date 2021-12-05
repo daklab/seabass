@@ -37,14 +37,16 @@ import datetime
 parser = argparse.ArgumentParser()
 
 #input file with LFCs
-parser.add_argument("model") # gene, hier, hier_alt
+parser.add_argument("model", choices=['gene', 'hier', 'hier_alt'])
 parser.add_argument("input_file")
 parser.add_argument("analysis_name")
 parser.add_argument("output_dir_name")
 
 parser.add_argument("--multiday", action='store_true')
 
-parser.add_argument("--model", action='store_true')
+#parser.add_argument("--learn_sigma", action='store_true')
+#parser.add_argument("--learn_sigma", action='store_true')
+#parser.add_argument("--learn_sigma", action='store_true')
 
 import __main__
 is_interactive = not hasattr(__main__, '__file__')
@@ -119,7 +121,7 @@ pyro.set_rng_seed(101)
 if hier: 
     data = seabass_hier.HierData.from_pandas(dat) 
     if model_type == "hier_alt": 
-        model, guide, losses = hier_alt.fit(data, iterations=3000)
+        model, guide, losses = hier_alt.fit(data, iterations=3000, sigma_noise = None)
     else: 
         model, guide, losses = seabass_hier.fit(data, iterations=3000)
 else: 

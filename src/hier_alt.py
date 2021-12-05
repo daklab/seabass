@@ -43,6 +43,8 @@ def model_base(data,
         efficacy_prior_b = pyro.sample("efficacy_prior_b", efficacy_prior_b)
     if type(junction_std) != float: 
         junction_std = pyro.sample("junction_std", junction_std)
+    if type(sigma_noise) != float: 
+        sigma_noise = pyro.sample("sigma_noise", sigma_noise)
     
     guide_efficacy = pyro.sample("guide_efficacy", 
         dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)
@@ -67,11 +69,13 @@ def fit(data,
        print_every = 100,
        lr = 0.03,
        learn_sigma = True, 
+       sigma_noise = 1., # set to None to learn
        learn_efficacy_prior = True,
        learn_junc_std = True): 
     
     model = lambda data:  model_base(data, 
          sigma_prior = dist.HalfCauchy(torch.tensor(2.)) if learn_sigma else 2., 
+         sigma_noise = dist.HalfCauchy(torch.tensor(1.)) if (sigma_noise is None) else sigma_noise, 
          efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
          efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.,
          junction_std = dist.HalfCauchy(torch.tensor(1.)) if learn_junc_std else 1., 
@@ -80,7 +84,8 @@ def fit(data,
     to_optimize = ["sigma_prior",
                    "efficacy_prior_a",
                    "efficacy_prior_b",
-                  "junction_std"]
+                  "junction_std",
+                  "sigma_noise"]
     
     guide = AutoGuideList(model)
     guide.add(AutoDiagonalNormal(poutine.block(model, hide = to_optimize)))
