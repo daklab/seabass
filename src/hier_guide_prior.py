@@ -32,29 +32,30 @@ def model_base(data,
     All others are hyperparameters which can be fixed values or distributions, the latter
     if the hyperparameter is being learnt. 
     """
+    def convertr(hyperparam, name): 
+        return pyro.sample(name, hyperparam) if (type(hyperparam) != float) else torch.tensor(hyperparam, device = data.device) 
+    sigma_prior = convertr(sigma_prior, "sigma_prior")
+    junction_std = convertr(junction_std, "junction_std")
+    efficacy_prior_b = convertr(efficacy_prior_b, "efficacy_prior_b")
 
-    if type(sigma_prior) != float: 
-        sigma_prior = pyro.sample("sigma_prior", sigma_prior)
-    if type(junction_std) != float: 
-        junction_std = pyro.sample("junction_std", junction_std)
-        
-    guide_a = pyro.sample("guide_a", dist.Normal(1, 1).to_event(1) )
-    guide_b = pyro.sample("guide_b", dist.Normal(0, 1).to_event(1) )
-    efficacy_std = pyro.sample("efficacy_std", dist.HalfCauchy(torch.tensor(2.)).to_event(1) )
+    one = torch.tensor(1., device = data.device)
+    guide_a = pyro.sample("guide_a", dist.Normal(one, one) )
+    guide_b = pyro.sample("guide_b", dist.Normal(0, one) )
+    efficacy_std = pyro.sample("efficacy_std", dist.HalfCauchy(one * 2.) )
     
     guide_efficacy = pyro.sample("guide_efficacy", 
-        dist.Normal(guide_a * data.predicted_guide_eff + guide_b, efficacy_std).to_event(1)
+        dist.Normal(guide_a * data.sgrna_pred + guide_b, efficacy_std).to_event(1)
     )
     
     gene_essentiality = pyro.sample("gene_essentiality",
-        dist.Normal(0., sigma_prior).expand([data.num_genes]).to_event(1)
+        dist.Normal(0., sigma_prior).expand([data.num_genes]).to_event(1) # sigma_prior knowing the device is enough i think
     )
     
     junction_score = pyro.sample("junction_score", 
         dist.Normal(gene_essentiality[data.junc2gene], junction_std).to_event(1)
     )
 
-    mean = junction_score[data.junction_indices] * torch.logit(guide_efficacy[data.guide_indices])
+    mean = junction_score[data.junction_indices] * torch.sigmoid(guide_efficacy[data.guide_indices])
     if data.multiday: 
         mean *= data.timepoint 
     with pyro.plate("data", data.guide_indices.shape[0]):
@@ -66,10 +67,10 @@ def fit(data,
        lr = 0.03,
        learn_sigma = True, 
        learn_junc_std = True): 
-    
+    one = torch.tensor(1., device = data.device)
     model = lambda data:  model_base(data, 
-         sigma_prior = dist.HalfCauchy(torch.tensor(2.)) if learn_sigma else 2., 
-         junction_essentiality_std = dist.HalfCauchy(torch.tensor(1.)) if learn_junc_std else 1., 
+         sigma_prior = dist.HalfCauchy(2. * one) if learn_sigma else 2., 
+         junction_std = dist.HalfCauchy(one) if learn_junc_std else 1., 
                                     )
     to_optimize = ["sigma_prior",
                    "guide_a",

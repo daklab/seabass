@@ -7,15 +7,15 @@
 
 ## TODO
 - multiple days
-- deal with bimodality: are these just 0s? (use Harm's pipeline? Let Karin do this)
+- deal with bimodality: are these just 0s? Yes. (use Harm's pipeline? Let Karin do this)
 - learn prior on efficacy? Beta prior done. mixture?
 - learn prior on essentiality? Variance done. 
 - should prior on essentiality have negative mean? (in essential arm) 
-- hierarchy over genes/junctions
+- hierarchy over genes/junctions. done.
 - version 1: lfc = guide_efficacy * junction_targetability * gene_essentiality [done] (results are weird?) 
 - version 2: junction_essentiality ~ N( gene_essentiality, sigma2 ) [done]
 - allow conditioning efficacy (and essentiality?) on prediction from Andrew's model
 - conditioning on isoform(junction) expression for isoform arm
-- condition on known gene essentiality
-- is drop-out a problem (nonlinear) 
+- condition on known gene essentiality? will be circular. 
+- is drop-out a problem? (nonlinear) 
 - predict junction targettability from sequence? 

@@ -4,7 +4,7 @@ from pyro import poutine
 import pyro.distributions as dist
 from pyro.nn import PyroSample, PyroModule
 from pyro.infer.autoguide import AutoDiagonalNormal, AutoGuideList, AutoDelta
-from pyro.infer import SVI, Trace_ELBO
+from pyro.infer import SVI, Trace_ELBO, RenyiELBO
 from pyro.infer import Predictive
 from torch.distributions import constraints
 
@@ -19,12 +19,14 @@ class ScreenData:
     gene_indices: torch.Tensor
     genes: pd.Index
     guide_indices: torch.Tensor
-    sgrnas: pd.Index    
+    sgrnas: pd.Index
+    sgrna_pred: torch.Tensor
     logFC: torch.Tensor
     timepoint: torch.Tensor
     num_guides: int = field(default = 0, init = False)
     num_genes: int = field(default = 0, init = False)
     multiday: bool = field(default = False , init = False)
+    device: torch.device
     
     def __post_init__(self):
         self.num_guides = max(self.guide_indices) + 1
@@ -32,21 +34,25 @@ class ScreenData:
         self.multiday = self.timepoint.std().item() > 0.
         
     @staticmethod
-    def from_pandas(df): 
+    def from_pandas(df, guide_preds = None, device = "cpu"): 
         
         guide_indices, sgrnas = pd.factorize(df.sgrna) # make numeric
         gene_indices, genes = pd.factorize(df.gene)
+        
+        guide_eff = pd.merge( pd.DataFrame( { "sgrna" : sgrnas } ), guide_preds, on = "sgrna", how = "left").guide_eff.fillna(0).values if (not guide_preds is None) else np.zeros( len(sgrnas), dtype = np.float )
         
         if df.week.std() == 0: 
             df.week[:] = 1
 
         return ScreenData(
-            guide_indices = torch.tensor(guide_indices, dtype = torch.long),
-            gene_indices = torch.tensor(gene_indices, dtype = torch.long), 
-            logFC = torch.tensor(np.array(df.logFC), dtype = torch.float), 
-            timepoint = torch.tensor(np.array(df.week), dtype = torch.float),
+            guide_indices = torch.tensor(guide_indices, dtype = torch.long, device = device),
+            gene_indices = torch.tensor(gene_indices, dtype = torch.long, device = device), 
+            sgrna_pred = torch.tensor(guide_eff, dtype = torch.float, device = device), 
+            logFC = torch.tensor(np.array(df.logFC), dtype = torch.float, device = device), 
+            timepoint = torch.tensor(np.array(df.week), dtype = torch.float, device = device),
             sgrnas = sgrnas, 
-            genes = genes
+            genes = genes,
+            device = device 
         )
 
 # model definition 
@@ -54,7 +60,8 @@ def model_base(data,
          efficacy_prior_a = 1., # shape1 of beta(a,b) prior on guide efficacy
          efficacy_prior_b = 1., # shape2 of beta(a,b) prior on guide efficacy
          sigma_noise = 1., # noise std estimated from non-targetting guides
-         sigma_prior = 2. 
+         sigma_prior = 2.,
+         learn_efficacy = True
          ): 
     """ Seabass model for genes (or junctions). 
     
@@ -70,16 +77,24 @@ def model_base(data,
     if the hyperparameter is being learnt. 
     """
     
+    def convertr(hyperparam, name): 
+        return pyro.sample(name, hyperparam) if (type(hyperparam) != float) else torch.tensor(hyperparam, device = data.device) 
+    sigma_prior = convertr(sigma_prior, "sigma_prior")
+    efficacy_prior_a = convertr(efficacy_prior_a, "efficacy_prior_a")
+    efficacy_prior_b = convertr(efficacy_prior_b, "efficacy_prior_b")
+    
     if type(sigma_prior) != float: 
         sigma_prior = pyro.sample("sigma_prior", sigma_prior)
     if type(efficacy_prior_a) != float: 
         efficacy_prior_a = pyro.sample("efficacy_prior_a", efficacy_prior_a)
     if type(efficacy_prior_b) != float: 
         efficacy_prior_b = pyro.sample("efficacy_prior_b", efficacy_prior_b)
-        
-    guide_efficacy = pyro.sample("guide_efficacy", 
-        dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)
-    )
+     
+    if learn_efficacy: 
+        guide_efficacy = pyro.sample("guide_efficacy", 
+            dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)) 
+    else: 
+        guide_efficacy = dist.Beta(efficacy_prior_a, efficacy_prior_b).rsample(sample_shape=[data.num_guides])
 
     gene_essentiality = pyro.sample("gene_essentiality",
         dist.Normal(0., sigma_prior).expand([data.num_genes]).to_event(1)
@@ -117,12 +132,15 @@ def fit(data,
        print_every = 100,
        lr = 0.03,
        learn_sigma = True, 
-       learn_efficacy_prior = True): 
+       learn_efficacy_prior = True, 
+       use_renyi = False): 
+    
+    two = torch.tensor(2., device = data.device)
     
     model = lambda data:  model_base(data, 
-         sigma_prior = dist.HalfCauchy(torch.tensor(2.)) if learn_sigma else 2., 
-         efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
-         efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.
+         sigma_prior = dist.HalfCauchy(two) if learn_sigma else 2., 
+         efficacy_prior_a = dist.Gamma(two,two) if learn_efficacy_prior else 1., 
+         efficacy_prior_b = dist.Gamma(two,two) if learn_efficacy_prior else 1.
                                     )
     
     to_optimize = ["sigma_prior",
@@ -136,7 +154,7 @@ def fit(data,
     #guide = AutoDiagonalNormal(model)
     
     adam = pyro.optim.Adam({"lr": lr})
-    svi = SVI(model, guide, adam, loss=Trace_ELBO())
+    svi = SVI(model, guide, adam, loss=RenyiELBO() if use_renyi else Trace_ELBO() ) 
 
     # train/fit model
     pyro.clear_param_store()

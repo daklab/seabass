@@ -18,7 +18,8 @@ def model_base(data,
          efficacy_prior_b = 1., # shape2 of beta(a,b) prior on guide efficacy
          junction_std = 1., # junc ~ N(gene, std^2)
          sigma_noise = 1., # noise std estimated from non-targetting guides
-         sigma_prior = 2. 
+         sigma_prior = 2.,
+         learn_efficacy = True
          ): 
     """ Seabass model for junctions and genes. 
     
@@ -35,21 +36,20 @@ def model_base(data,
     if the hyperparameter is being learnt. 
     """
 
-    if type(sigma_prior) != float: 
-        sigma_prior = pyro.sample("sigma_prior", sigma_prior)
-    if type(efficacy_prior_a) != float: 
-        efficacy_prior_a = pyro.sample("efficacy_prior_a", efficacy_prior_a)
-    if type(efficacy_prior_b) != float: 
-        efficacy_prior_b = pyro.sample("efficacy_prior_b", efficacy_prior_b)
-    if type(junction_std) != float: 
-        junction_std = pyro.sample("junction_std", junction_std)
-    if type(sigma_noise) != float: 
-        sigma_noise = pyro.sample("sigma_noise", sigma_noise)
+    def convertr(hyperparam, name): 
+        return pyro.sample(name, hyperparam) if (type(hyperparam) != float) else torch.tensor(hyperparam, device = data.device) 
+    sigma_prior = convertr(sigma_prior, "sigma_prior")
+    efficacy_prior_a = convertr(efficacy_prior_a, "efficacy_prior_a")
+    efficacy_prior_b = convertr(efficacy_prior_b, "efficacy_prior_b")
+    junction_std = convertr(junction_std, "junction_std")
+    sigma_noise = convertr(sigma_noise, "sigma_noise")
     
-    guide_efficacy = pyro.sample("guide_efficacy", 
-        dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)
-    )
-    
+    if learn_efficacy: 
+        guide_efficacy = pyro.sample("guide_efficacy", 
+            dist.Beta(efficacy_prior_a, efficacy_prior_b).expand([data.num_guides]).to_event(1)) 
+    else: 
+        guide_efficacy = dist.Beta(efficacy_prior_a, efficacy_prior_b).rsample(sample_shape=[data.num_guides])
+
     gene_essentiality = pyro.sample("gene_essentiality",
         dist.Normal(0., sigma_prior).expand([data.num_genes]).to_event(1)
     )
@@ -71,14 +71,18 @@ def fit(data,
        learn_sigma = True, 
        sigma_noise = 1., # set to None to learn
        learn_efficacy_prior = True,
-       learn_junc_std = True): 
+       learn_junc_std = True,
+       learn_efficacy = True): 
     
+    one = torch.tensor(1., device = data.device) 
+    two = 2. * one
     model = lambda data:  model_base(data, 
-         sigma_prior = dist.HalfCauchy(torch.tensor(2.)) if learn_sigma else 2., 
-         sigma_noise = dist.HalfCauchy(torch.tensor(1.)) if (sigma_noise is None) else sigma_noise, 
-         efficacy_prior_a = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1., 
-         efficacy_prior_b = dist.Gamma(torch.tensor(2.),torch.tensor(2.)) if learn_efficacy_prior else 1.,
-         junction_std = dist.HalfCauchy(torch.tensor(1.)) if learn_junc_std else 1., 
+         sigma_prior = dist.HalfCauchy(two) if learn_sigma else 2., 
+         sigma_noise = dist.HalfCauchy(one) if (sigma_noise is None) else sigma_noise, 
+         efficacy_prior_a = dist.Gamma(two,two) if learn_efficacy_prior else 1., 
+         efficacy_prior_b = dist.Gamma(two,two) if learn_efficacy_prior else 1.,
+         junction_std = dist.HalfCauchy(one) if learn_junc_std else 1., 
+         learn_efficacy = learn_efficacy
                                     )
     
     to_optimize = ["sigma_prior",
