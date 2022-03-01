@@ -82,13 +82,6 @@ def model_base(data,
     sigma_prior = convertr(sigma_prior, "sigma_prior")
     efficacy_prior_a = convertr(efficacy_prior_a, "efficacy_prior_a")
     efficacy_prior_b = convertr(efficacy_prior_b, "efficacy_prior_b")
-    
-    if type(sigma_prior) != float: 
-        sigma_prior = pyro.sample("sigma_prior", sigma_prior)
-    if type(efficacy_prior_a) != float: 
-        efficacy_prior_a = pyro.sample("efficacy_prior_a", efficacy_prior_a)
-    if type(efficacy_prior_b) != float: 
-        efficacy_prior_b = pyro.sample("efficacy_prior_b", efficacy_prior_b)
      
     if learn_efficacy: 
         guide_efficacy = pyro.sample("guide_efficacy", 

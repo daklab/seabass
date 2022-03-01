@@ -23,7 +23,7 @@ def model_base(data,
     guide_efficacy ~ Normal(a * predicted_eff + b, efficacy_std) for each guide
     gene_essentiality ~ Normal(0, sigma_prior^2) for each gene
     junction_essentiality ~ Normal(gene_essentiality, junction_std^2) matching junctions to genes
-    log2FC = junction_essentiality * guide_efficacy [* timepoint] + noise
+    log2FC = junction_essentiality * sigmoid(guide_efficacy) [* timepoint] + noise
     noise ~ Normal(0, sigma_noise^2) 
     
     Parameters
@@ -36,8 +36,7 @@ def model_base(data,
         return pyro.sample(name, hyperparam) if (type(hyperparam) != float) else torch.tensor(hyperparam, device = data.device) 
     sigma_prior = convertr(sigma_prior, "sigma_prior")
     junction_std = convertr(junction_std, "junction_std")
-    efficacy_prior_b = convertr(efficacy_prior_b, "efficacy_prior_b")
-
+    
     one = torch.tensor(1., device = data.device)
     guide_a = pyro.sample("guide_a", dist.Normal(one, one) )
     guide_b = pyro.sample("guide_b", dist.Normal(0, one) )

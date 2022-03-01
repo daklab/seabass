@@ -18,6 +18,8 @@ class HierData(seabass.ScreenData):
     junction_indices: torch.Tensor
     junctions: pd.Index
     junc2gene: torch.Tensor
+    guide2junc: torch.Tensor
+    perc_usage: torch.Tensor
     num_junctions: int = 0
     
     def __post_init__(self):
@@ -31,9 +33,17 @@ class HierData(seabass.ScreenData):
         gene_indices, genes = pd.factorize(df.gene)
         junction_indices, junctions = pd.factorize(df.junction)
         
+        perc_usage = df[["junction","perc.usage"]].drop_duplicates()
+        perc_usage = perc_usage[~perc_usage.junction.isna()]
+        assert(np.all(perc_usage.junction == junctions.values))
+        perc_usage = perc_usage["perc.usage"].fillna(100.).values / 100.
+
         junc2gene = pd.DataFrame({'junction_indices' : junction_indices, 
                           'gene_indices' : gene_indices}).drop_duplicates()
-        assert(np.all(junc2gene.junction_indices == np.arange(junc2gene.shape[0])))
+        guide2junc = pd.DataFrame({'guide_indices' : guide_indices,
+                                   'junction_indices' : junction_indices}).drop_duplicates()
+        
+        #assert(np.all(junc2gene.junction_indices == np.arange(junc2gene.shape[0])))
         
         guide_eff = pd.merge( pd.DataFrame( { "sgrna" : sgrnas } ), guide_preds, on = "sgrna", how = "left").guide_eff.fillna(0).values if (not guide_preds is None) else np.zeros( len(sgrnas), dtype = np.float )
         
@@ -48,6 +58,8 @@ class HierData(seabass.ScreenData):
             logFC = torch.tensor(np.array(df.logFC), dtype = torch.float, device = device), 
             timepoint = torch.tensor(np.array(df.week), dtype = torch.float, device = device),
             junc2gene = torch.tensor(np.array(junc2gene.gene_indices), dtype = torch.long, device = device), 
+            guide2junc = torch.tensor(np.array(guide2junc.junction_indices), dtype = torch.long, device = device), 
+            perc_usage = torch.tensor(perc_usage, dtype = torch.float, device = device), 
             sgrnas = sgrnas, 
             junctions = junctions,
             genes = genes,
