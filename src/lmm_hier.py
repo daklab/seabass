@@ -10,12 +10,27 @@ from pyro.distributions import constraints
 from pyro.distributions.util import eye_like
 
 from scipy.stats import norm
+import scipy.stats
+
 import statsmodels.stats.multitest 
 
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
 import seabass
+
+def robustifier(original_func, max_attempts, *args, **kwargs):
+    
+    attempts = 0
+    while attempts < max_attempts:
+        try:
+            result = original_func(*args, **kwargs)
+            return result
+        except Exception as e:
+            print(f"Attempt {attempts + 1} failed with error: {str(e)}")
+            attempts += 1
+
+    raise Exception("Function failed after maximum attempts")
 
 def convertr(hyperparam, name, device): 
     return pyro.sample(name, hyperparam) if (type(hyperparam) != float) else torch.tensor(hyperparam, device = device) 
@@ -247,8 +262,9 @@ def fit(
     hierarchical_noise,
     hierarchical_slope,
     per_gene_variance = True, 
-    iterations = 1000,
-    print_every = 100,
+    iterations = 500,
+    print_every = 200,
+    end = "\r", 
     lr = 0.03,
     slope_noise = None, # set to None to learn, fix to a value (0 to have no random_slope)
     log_slope_noise_mean = None,
@@ -265,8 +281,8 @@ def fit(
     structured_guide = True,
     init_guide_scores = None, 
     init_random_slopes = None,
-    finetune_iterations = 0,
-    finetune_particles = 30
+    stall_window = 10,
+    max_particles = 32
 ): 
     
     if not init_guide_scores is None: 
@@ -274,6 +290,8 @@ def fit(
 
     if not init_random_slopes is None:
         init_random_slopes = torch.tensor(init_random_slopes, dtype = data.logFC.dtype, device = data.device)
+
+    if NT_model: per_gene_variance = False
 
     pyro.clear_param_store()
     
@@ -300,8 +318,6 @@ def fit(
         slope_t_df = dist.Gamma(two,two/10.) if (slope_t_df is None) else slope_t_df)
     
     to_optimize = []
-    
-    assert(not (NT_model and per_gene_variance))
     
     assert(not (hierarchical_slope and slope_noise==0.)) 
     
@@ -394,30 +410,33 @@ def fit(
                     values={"random_slope" :  torch.zeros([data.num_replicates,data.num_guides],device=data.device) if init_random_slopes is None else init_random_slopes.T })))
     
     adam = pyro.optim.Adam({"lr": lr})
-    svi = SVI(model, guide, adam, loss=Trace_ELBO())
 
     # train/fit model
-    accurate_elbo_func = Trace_ELBO(num_particles = 100, vectorize_particles = True)(model, guide)
+    #accurate_elbo_func = Trace_ELBO(num_particles = 100, vectorize_particles = True)(model, guide)
     
     #losses = [ accurate_elbo_func(data).item() ]
     #print("Initial loss: %.4f" % (losses[0] / len(data.guide_indices)))
     losses = []
     optim_record = []
-    for j in range(iterations):
-        loss = svi.step(data)
-        losses.append(loss)
-        optim_record.append({ k:pyro.param("AutoGuideList.0." + k).detach().item() for k in to_optimize })
-        if j % print_every == 0:
-            print("[iteration %04d] loss: %.4f" % (j + 1, loss / len(data.guide_indices)))
-    
-    svi_finetune = SVI(model, guide, adam, loss=Trace_ELBO(num_particles = finetune_particles))
-    for j in np.arange(finetune_iterations):
-        loss = svi_finetune.step(data)
-        losses.append(loss)
-        optim_record.append({ k:pyro.param("AutoGuideList.0." + k).detach().item() for k in to_optimize })
-    
-    #losses.append( accurate_elbo_func(data).item() )
-    
+    num_particles = 1
+       
+    while num_particles <= max_particles: 
+        svi = SVI(model, guide, adam, loss=Trace_ELBO(num_particles = num_particles, vectorize_particles = False))
+        iteration = 0 
+        while True: 
+            loss = svi.step(data)
+            losses.append(loss)
+            optim_record.append({ k:pyro.param("AutoGuideList.0." + k).detach().item() for k in to_optimize })
+            iteration += 1
+            if iteration % print_every == 0:
+                print("[iteration %04d] loss: %.4f" % (iteration + 1, loss / len(data.guide_indices)), end = end)
+            if iteration > stall_window: 
+                R,p = scipy.stats.pearsonr(np.arange(stall_window), losses[-stall_window:])
+                if p>0.05 or R>0. or iteration > iterations: 
+                    num_particles *= 2
+                    print("Stalled after %i iterations. Increasing num_particles to %i." % (iteration + 1, num_particles))
+                    break
+
     posterior = extract_params(
         to_optimize, 
         NT_model = NT_model, 
@@ -428,9 +447,10 @@ def fit(
         slope_noise = slope_noise
     )
     
-    posterior["z"] = posterior["guide_score"] / posterior["guide_score_se"]
-    posterior["p"] = norm.cdf(-np.abs(posterior["z"]))
-    posterior["sig"],posterior["q"] = statsmodels.stats.multitest.fdrcorrection(posterior["p"], alpha=0.2)
+    if not NT_model: 
+        posterior["z"] = posterior["guide_score"] / posterior["guide_score_se"]
+        posterior["p"] = 2. * norm.cdf(-np.abs(posterior["z"]))
+        posterior["sig"],posterior["q"] = statsmodels.stats.multitest.fdrcorrection(posterior["p"], alpha=0.2)
 
     optim_record = {key: [d[key] for d in optim_record] for key in optim_record[0]}
 
