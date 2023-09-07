@@ -38,6 +38,7 @@ class ScreenData:
         
     @staticmethod
     def from_pandas(df, guide_preds = None, device = "cpu"): 
+        """df should have the following columns: sgrna, gene, replicate, week, logFC"""
         
         guide_indices, sgrnas = pd.factorize(df.sgrna) # make numeric
         gene_indices, genes = pd.factorize(df.gene)
