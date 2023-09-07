@@ -1,0 +1,23 @@
+# Splicing screen Efficacy Analysis with BAyesian StatisticS
+
+This is the more ambitious version/branch which separate latent variables for the essentiality of each gene (or junction), and for the efficacy of each guide. In practice it seems to overfit. 
+
+## To run current version of seabass (hier_alt.py)
+```python run_hier_alt.py ['cas13_LFCS_guides'] ['name_analysis'] ['output_directory']```
+
+- this will generate an output directory with posterior values for guides, junctions and genes as well as summary plots 
+
+## TODO
+- multiple days
+- deal with bimodality: are these just 0s? Yes. (use Harm's pipeline? Let Karin do this)
+- learn prior on efficacy? Beta prior done. mixture?
+- learn prior on essentiality? Variance done. 
+- should prior on essentiality have negative mean? (in essential arm) 
+- hierarchy over genes/junctions. done.
+- version 1: lfc = guide_efficacy * junction_targetability * gene_essentiality [done] (results are weird?) 
+- version 2: junction_essentiality ~ N( gene_essentiality, sigma2 ) [done]
+- allow conditioning efficacy (and essentiality?) on prediction from Andrew's model
+- conditioning on isoform(junction) expression for isoform arm
+- condition on known gene essentiality? will be circular. 
+- is drop-out a problem? (nonlinear) 
+- predict junction targettability from sequence? 
