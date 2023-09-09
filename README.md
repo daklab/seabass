@@ -1,21 +1,27 @@
-# Splicing screen Efficacy Analysis with BAyesian StatisticS
+# Screen Efficacy Analysis with BAyesian StatisticS
 
-## To run current version of seabass (hier_alt.py)
-```python run_hier_alt.py ['cas13_LFCS_guides'] ['name_analysis'] ['output_directory']```
+SEABASS is a hierarchical linear mixed model for analysing CRISPR screen data. It can handle multiple time-points and replicates. It uses stochastic variational inference, implemented in `pyro` to fit model parameters. This enables using heavy-tailed noise distributions which provide a better fit to data and robustness to outliers. 
 
-- this will generate an output directory with posterior values for guides, junctions and genes as well as summary plots 
+## Probabilistic model
 
-## TODO
-- multiple days
-- deal with bimodality: are these just 0s? Yes. (use Harm's pipeline? Let Karin do this)
-- learn prior on efficacy? Beta prior done. mixture?
-- learn prior on essentiality? Variance done. 
-- should prior on essentiality have negative mean? (in essential arm) 
-- hierarchy over genes/junctions. done.
-- version 1: lfc = guide_efficacy * junction_targetability * gene_essentiality [done] (results are weird?) 
-- version 2: junction_essentiality ~ N( gene_essentiality, sigma2 ) [done]
-- allow conditioning efficacy (and essentiality?) on prediction from Andrew's model
-- conditioning on isoform(junction) expression for isoform arm
-- condition on known gene essentiality? will be circular. 
-- is drop-out a problem? (nonlinear) 
-- predict junction targettability from sequence? 
+The probabilistic model for SEABASS is: 
+
+guide_score ~ Normal(0, guide_std^2) for each guide
+log2FC = (guide_score + guide_random_slope) * timepoint + noise
+noise ~ D1(0, sigma_noise) for each observation
+guide_random_slope ~ D2(0, slope_noise) for each (guide,replicate) pair
+
+where guide_score is a slope and D1 and D2 are location-scale distributions which can be either normal, Cauchy, Laplace or StudentT. 
+
+The noise standard deviation (std) can either be shared across guides (hierarchical_noise = False), or per guide but distributed according to a learned prior (hierarchical_noise = True): 
+
+noise_std ~ logNormal(log_guide_std_mean,log_guide_std_std^2)
+
+Similarly slope_noise can either be shared shared guides (hierarchical_slope = False), or per guide but distributed according to a learned prior (hierarchical_noise = True):
+
+slope_noise ~ logNormal(log_sigma_noise_mean,log_sigma_noise_std^2)
+
+Additionally SEABASS can learn a per gene guide_std ~ logNormal(log_guide_std_mean, log_guide_std_std^2) to account for differences in essentiality. 
+
+## Usage
+

@@ -17,9 +17,24 @@ import statsmodels.stats.multitest
 import numpy as np
 import pandas as pd
 from dataclasses import dataclass
-import seabass
 
 def robustifier(original_func, max_attempts, *args, **kwargs):
+    """
+    A utility function to make a given function more robust by allowing it to
+    retry a specified number of times upon encountering exceptions.
+
+    Parameters:
+    original_func (callable): The original function to be made robust.
+    max_attempts (int): The maximum number of times to retry the original function.
+    *args: Variable-length positional arguments to pass to the original function.
+    **kwargs: Variable-length keyword arguments to pass to the original function.
+
+    Returns:
+    Any: The result of the original function if successful.
+
+    Raises:
+    Exception: If the original function fails after the maximum number of attempts.
+    """
     
     attempts = 0
     while attempts < max_attempts:
@@ -33,9 +48,31 @@ def robustifier(original_func, max_attempts, *args, **kwargs):
     raise Exception("Function failed after maximum attempts")
 
 def convertr(hyperparam, name, device): 
+    """
+    Convert a hyperparameter to Pyro distribution (if learning the parameter) or Torch tensor (if fixing it to some value), depending on its type. 
+
+    Parameters:
+    hyperparam (float or Pyro distribution): The hyperparameter to be converted.
+    name (str): Name for the Pyro sample if `hyperparam` is a distribution.
+    device (str or torch.device): Device to place the resulting tensor on if `hyperparam` is a float.
+
+    Returns:
+    pyro.sample or torch.Tensor: If `hyperparam` is not a float, it returns a Pyro sample using the given name.
+                                 If `hyperparam` is a float, it returns a Torch tensor placed on the specified device.
+    """
+    
     return pyro.sample(name, hyperparam) if (type(hyperparam) != float) else torch.tensor(hyperparam, device = device) 
 
 def get_dist(name, t_df, device): 
+    """
+    Get a Pyro distribution based on the given parameters.
+
+    Parameters:
+    name (str): A name if we need to introduce a new parameter (just used for the DoF for a t-distribution).
+    t_df (float or Pyro distribution): The degrees of freedom parameter for the distribution. t_df==float('inf') gives a Normal, 0.0 gives Laplace, 1.0 gives Cauchy, other gives StudentT. If t_df is a Pyro distribution then the DoF will be learnt. 
+    device (str or torch.device): Device to place the resulting distribution (if applicable).
+    """
+    
     if type(t_df) == float and np.isinf(t_df):
         return dist.Normal
     elif type(t_df) == float and t_df == 0.: # denotes Laplace
@@ -65,17 +102,10 @@ def model_base(
     noise_t_df = np.inf,
     slope_t_df = np.inf
 ): 
-    """ linear mixed model for guides. 
-    
-    guide_score ~ Normal(0, guide_std^2) for each guide
-    log2FC = (guide_score + guide_random_slope) [* timepoint] + noise
-    noise ~ Normal(0, sigma_noise^2) for each observation
-    guide_random_slope ~ Normal(0, slope_noise^2) for each (guide,replicate) pair
-    
-    Parameters
-    ----------
-    Data: a seabass.Data object. 
-    All others are hyperparameters which can be fixed values or distributions, the latter
+    """ 
+    Base model for SEABASS. See `lmm_hier.fit` for details. 
+
+    Hyperparameters which can be fixed values (floats) or distributions, the latter
     if the hyperparameter is being learnt. 
     """
     
@@ -150,6 +180,17 @@ def model_base(
             obs = data.logFC)
 
 def guide_structured(data, NT_model, init_guide_scores = None, init_random_slopes = None):
+    """
+    Create a structured Pyro guide for probabilistic modeling in a multiday, multi-replicate experiment.
+    
+    This builds a guide (=variational posterior) for the guide_score (=true slope) and random_slopes. For each guide gets its own full rank multivariate Gaussian. This is a little tricky to do in Pyro. 
+
+    Parameters:
+    data (object): screen_data.ScreenData object.
+    NT_model (bool): Indicates whether we are just modelling non-targetting data. 
+    init_guide_scores (torch.Tensor, optional): Initial guide scores for each guide, if provided.
+    init_random_slopes (torch.Tensor, optional): Initial random slopes, if provided.
+    """
     
     assert(data.multiday) # only makes sense in this setting
     
@@ -164,27 +205,27 @@ def guide_structured(data, NT_model, init_guide_scores = None, init_random_slope
             dim = 1)
         
     P = init.shape[1]
-    loc = pyro.param("loc", init)
-    scale = pyro.param(
+    loc = pyro.param("loc", init) # guides x P
+    scale = pyro.param( # gives the diagional of each Cholesky, also guides x P
         "scale",
         torch.full_like(loc, 0.1), 
         constraint = constraints.positive
     )
-    unit_tril = pyro.param(
+    unit_tril = pyro.param( 
         "unit_tril",
-        eye_like(loc, P).repeat([data.num_guides,1,1]), 
+        eye_like(loc, P).repeat([data.num_guides,1,1]), # guides x P x P, so unit_tril[i,:,:] is the unit lower Chol factor for guide i
         constraint = constraints.unit_lower_cholesky
     )
     
-    scale_tril = scale[...,None] * unit_tril
+    scale_tril = scale[...,None] * unit_tril # Cholesky factors for every MVN, guides x P x P
     
     if NT_model: 
         random_slope_T = pyro.sample( # will be guides x P
             "random_slope_T", 
             dist.MultivariateNormal(loc, scale_tril = scale_tril).to_event(1), 
-            infer={'is_auxiliary': True}
+            infer={'is_auxiliary': True} 
         )
-        random_slope = pyro.sample(
+        random_slope = pyro.sample( # need to transpose
             "random_slope", 
             dist.Delta(random_slope_T.T).to_event(2))
     else:
@@ -195,10 +236,10 @@ def guide_structured(data, NT_model, init_guide_scores = None, init_random_slope
         )
         guide_score = pyro.sample(
             "guide_score", 
-            dist.Delta(post[...,-1]).to_event(1))
+            dist.Delta(post[...,-1]).to_event(1)) # last column gives guide_score
         random_slope = pyro.sample(
             "random_slope", 
-            dist.Delta(post[...,0:-1].T).to_event(2))
+            dist.Delta(post[...,0:-1].T).to_event(2)) # first P-1 columns give random slopes (one per replicate)
     
 def extract_params(
     to_optimize, 
@@ -209,6 +250,21 @@ def extract_params(
     structured_guide,
     slope_noise
 ):
+    """
+    Extract and format Pyro model parameters for analysis or visualization.
+
+    Parameters:
+    to_optimize (list): A list of parameter names to be extracted.
+    NT_model (bool): Indicates whether we are just modeling non-targetting guides
+    hierarchical_noise (bool): Indicates whether hierarchical noise variance is used in the model (see doc for `lmm_hier.fit`).
+    hierarchical_slope (bool): Indicates whether hierarchical random slope variance is used in the model (see doc for `lmm_hier.fit`).
+    per_gene_variance (bool): Indicates whether per-gene variance is used in the model.
+    structured_guide (bool): Indicates whether a structured guide is used in the model.
+    slope_noise (float): This is set to 0. if no random slopes are not used. 
+
+    Returns:
+    dict: A dictionary containing extracted and formatted parameter values.
+    """
 
     to_return = { k:pyro.param("AutoGuideList.0." + k) for k in to_optimize }
     
@@ -266,7 +322,7 @@ def fit(
     print_every = 200,
     end = "\r", 
     lr = 0.03,
-    slope_noise = None, # set to None to learn, fix to a value (0 to have no random_slope)
+    slope_noise = None,
     log_slope_noise_mean = None,
     log_slope_noise_std = None,
     sigma_noise = None, 
@@ -275,7 +331,7 @@ def fit(
     guide_std = None, 
     log_guide_std_mean = None,
     log_guide_std_std = None,
-    t_df = None, # None to learn t in StudentT, 0=Laplace, 1=Cauchy, Inf=Normal. Other values given fixed t StudentT.
+    t_df = None, 
     noise_t_df = None,
     slope_t_df = None, 
     structured_guide = True,
@@ -284,6 +340,44 @@ def fit(
     stall_window = 10,
     max_particles = 32
 ): 
+    """
+    Hierarchical linear mixed model for guides. 
+    
+    guide_score ~ Normal(0, guide_std^2) for each guide
+    log2FC = (guide_score + guide_random_slope) [* timepoint] + noise
+    noise ~ Normal(0, sigma_noise^2) for each observation
+    guide_random_slope ~ Normal(0, slope_noise^2) for each (guide,replicate) pair
+    
+    Student-t distributions are used for various priors, with the convention that setting the degrees of freedom to 0 gives Laplace, 1 gives Cauchy, and Inf gives Normal. Other float values give fixed DoF in StudentT, and None learns the DoF in the model fitting. 
+    
+    Other parameters can be fixed to a value by passing a float, but will be learned during model fitting if None is passed (the default). 
+    
+    Parameters
+    ----------
+    Data: a screen_data.ScreenData object. 
+    NT_model: if true, then we are just fitting the non-targetting guide distribution. This means the true slope is fixed to 0. 
+    hierarchical_noise: if true, every guide has its own noise variance from a common prior noise_std ~ logNormal(log_guide_std_mean,log_guide_std_std^2)
+    hierarchical_slope: if true, every guide has its own slope_noise from a common prior slope_noise ~ logNormal(log_sigma_noise_mean,log_sigma_noise_std^2)
+    per_gene_variance (bool): whether there is a per gene guide_std (prior std on slopes) to account for variation in essentiality. In that case guide_std ~ logNormal(log_guide_std_mean, log_guide_std_std^2).
+    iterations (int): maximum # of iterations to run for each # particles
+    print_every (int): how often to print progress
+    end (string): what to end progress printing lines with (usually "\r" to overwrite or "\n" to not)
+    lr (float): learning rate
+    slope_noise (float): this can be set to 0. to not include random slopes in the model. 
+    t_df (float or None, optional): Degrees of freedom for Student's t prior on guide_scores (i.e. slopes). 
+    noise_t_df (float or None, optional): Degrees of freedom for Student's t-distribution on noise.  Degrees of freedom for noise in Student's t-distribution. Set to None to learn, or fix to a value. Default is None.
+    slope_t_df (float or None, optional): Degrees of freedom for slope in Student's t-distribution. Set to None to learn, or fix to a value. Default is None.
+    structured_guide (bool, optional): If True, use a structured guide (MVN for slopes for a guide). Default is True.
+    init_guide_scores (numpy.ndarray or None, optional): Initial guide scores (slopes) for each guide. Default is None.
+    init_random_slopes (numpy.ndarray or None, optional): Initial random slopes. Default is None.
+    stall_window (int, optional): Number of iterations to wait before checking for optimization stall. Default is 10.
+    max_particles (int, optional): Maximum number of MC particles to use to calculate ELBO. Default is 32.
+
+    Returns
+    -------
+    tuple: A tuple containing the fitted model, guide, optimization loss history, posterior parameter values, and optimization record.
+
+    """
     
     if not init_guide_scores is None: 
         init_guide_scores = torch.tensor(init_guide_scores, dtype = data.logFC.dtype, device = data.device)
@@ -457,4 +551,41 @@ def fit(
     return( model, guide, losses, posterior, optim_record )
 
 
+def fit_NT_then_other(
+    NT_data, 
+    other_data,
+    robustifier_max_attempts = 10, 
+    **kwargs
+):
+    """
+    Fit noise distribution based on non-targetting (NT) guides, then fix these parameters on the "real" guides. 
+    
+    Parameters
+    ----------
+    NT_data: a screen_data.ScreenData for the NT guides. 
+    other_data: a screen_data.ScreenData for the "real" guides. 
+    robustifier_max_attempts: number of times to restart the second round SVI if it fails. Usually not necessary. 
+    **kwargs: passed to lmm_hier.fit
+    """
+    
+    all_hypers = ["sigma_noise", "log_slope_noise_mean", "log_slope_noise_std", 'slope_noise', "log_sigma_noise_mean", "log_sigma_noise_std", "noise_t_df", "slope_t_df"]
 
+    model, guide, losses, nt_posterior, optim_record = fit(
+        NT_data, 
+        NT_model=True,
+        **kwargs
+    )
+
+    for k in nt_posterior: 
+        if k in all_hypers: 
+            kwargs[k] = nt_posterior[k].item()
+
+    return robustifier(
+        fit, 
+        robustifier_max_attempts, 
+        data = other_data, 
+        NT_model = False, 
+        **kwargs
+    )
+    
+    
