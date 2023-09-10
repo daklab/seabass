@@ -25,3 +25,4 @@ Additionally SEABASS can learn a per gene guide_std ~ logNormal(log_guide_std_me
 
 ## Usage
 
+See `example_usage/example.ipynb`
