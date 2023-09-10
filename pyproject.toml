@@ -1,43 +1,7 @@
 [build-system]
-#requires = ["setuptools ~= 58.0", "wheel"]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build]
-include = [
-  "seabass/*.py"
-]
+requires = ["setuptools>=46.4.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "seabass"
 version = "0.0.1"
-authors = [
-  { name="David A Knowles", email="daknowles@nygenome.org" },
-]
-description = "SEABASS is a hierarchical linear mixed model for analysing CRISPR screen data. It can handle multiple time-points and replicates. It uses stochastic variational inference, implemented in `pyro` to fit model parameters. This enables using heavy-tailed noise distributions which provide a better fit to data and robustness to outliers. "
-readme = "README.md"
-requires-python = ">=3.7"
-classifiers = [
-    "Programming Language :: Python :: 3",
-    "Operating System :: OS Independent",
-]
-dependencies = [
-  "numpy~=1.23",
-  "torch~=2.0",
-  "pyro~=1.8",
-  "scipy~=1.5",
-  "statsmodels~=0.14",
-  "pandas~=2.0"
-]
-
-#[dependencies]
-#requests = "^2.25"
-#numpy = "^1.21"
-
-[project.urls]
-"Homepage" = "https://github.com/daklab/seabass"
-"Bug Tracker" = "https://github.com/daklab/seabass/issues"
-
-
-
-

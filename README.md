@@ -23,6 +23,10 @@ slope_noise ~ logNormal(log_sigma_noise_mean,log_sigma_noise_std^2)
 
 Additionally SEABASS can learn a per gene guide_std ~ logNormal(log_guide_std_mean, log_guide_std_std^2) to account for differences in essentiality. 
 
+## Installation
+
+`pip install seabass`
+
 ## Usage
 
 See `example_usage/example.ipynb`
