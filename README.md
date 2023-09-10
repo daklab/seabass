@@ -6,10 +6,10 @@ SEABASS is a hierarchical linear mixed model for analysing CRISPR screen data. I
 
 The probabilistic model for SEABASS is: 
 
-guide_score ~ Normal(0, guide_std^2) for each guide
-log2FC = (guide_score + guide_random_slope) * timepoint + noise
-noise ~ D1(0, sigma_noise) for each observation
-guide_random_slope ~ D2(0, slope_noise) for each (guide,replicate) pair
+* guide_score ~ Normal(0, guide_std^2) for each guide
+* log2FC = (guide_score + guide_random_slope) * timepoint + noise
+* noise ~ D1(0, sigma_noise) for each observation
+* guide_random_slope ~ D2(0, slope_noise) for each (guide,replicate) pair
 
 where guide_score is a slope and D1 and D2 are location-scale distributions which can be either normal, Cauchy, Laplace or StudentT. 
 
